@@ -951,6 +951,14 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Value:    metrics.DefaultConfig.InfluxDBOrganization,
 		Category: flags.MetricsCategory,
 	}
+
+	//[rollup-geth]
+	L1NodeRPCEndpointFlag = &cli.StringFlag{
+		Name:     "rollup.l1.rpc_endpoint",
+		Usage:    "L1 node RPC endpoint eg. http://0.0.0.0:8545",
+		Category: flags.RollupCategory,
+		Required: true,
+	}
 )
 
 var (
@@ -1248,6 +1256,15 @@ func setLes(ctx *cli.Context, cfg *ethconfig.Config) {
 	}
 	if ctx.IsSet(LightNoSyncServeFlag.Name) {
 		log.Warn("The light server has been deprecated, please remove this flag", "flag", LightNoSyncServeFlag.Name)
+	}
+}
+
+// [rollup-geth]
+func setRollupEthConfig(ctx *cli.Context, cfg *ethconfig.Config) {
+	if ctx.IsSet(L1NodeRPCEndpointFlag.Name) {
+		cfg.L1NodeRPCEndpoint = ctx.String(L1NodeRPCEndpointFlag.Name)
+	} else {
+		log.Crit("L1 node RPC endpoint URL not set", "flag", L1NodeRPCEndpointFlag.Name)
 	}
 }
 
@@ -1652,6 +1669,9 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setRequiredBlocks(ctx, cfg)
 	setLes(ctx, cfg)
 
+	//[rollup-geth]
+	setRollupEthConfig(ctx, cfg)
+
 	// Cap the cache allowance and tune the garbage collector
 	mem, err := gopsutil.VirtualMemory()
 	if err == nil {
@@ -1862,7 +1882,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 			if rawdb.ReadCanonicalHash(chaindb, 0) != (common.Hash{}) {
 				cfg.Genesis = nil // fallback to db content
 
-				//validate genesis has PoS enabled in block 0
+				// validate genesis has PoS enabled in block 0
 				genesis, err := core.ReadGenesis(chaindb)
 				if err != nil {
 					Fatalf("Could not read genesis from database: %v", err)
