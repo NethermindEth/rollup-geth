@@ -21,7 +21,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
+	"slices"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -42,6 +44,9 @@ type PrecompiledContract interface {
 	RequiredGas(input []byte) uint64  // RequiredPrice calculates the contract gas use
 	Run(input []byte) ([]byte, error) // Run runs the precompiled contract
 }
+
+// PrecompiledContracts contains the precompiled contracts supported at the given fork.
+type PrecompiledContracts map[common.Address]PrecompiledContract
 
 // PrecompiledContractsHomestead contains the default set of pre-compiled Ethereum
 // contracts used in the Frontier and Homestead releases.
@@ -154,24 +159,63 @@ func init() {
 	}
 }
 
-// ActivePrecompiles returns the precompiles enabled with the current configuration.
-func ActivePrecompiles(rules params.Rules) []common.Address {
+func activePrecompiledContracts(rules params.Rules, config *RollupPrecompileActivationConfig) PrecompiledContracts {
+	var activePrecompiles PrecompiledContracts
 	switch {
 	case rules.IsStylus:
-		return PrecompiledAddressesArbOS30
+		activePrecompiles = PrecompiledContractsArbOS30
 	case rules.IsArbitrum:
-		return PrecompiledAddressesArbitrum
+		activePrecompiles = PrecompiledContractsArbitrum
 	case rules.IsCancun:
-		return PrecompiledAddressesCancun
+		activePrecompiles = PrecompiledContractsCancun
 	case rules.IsBerlin:
-		return PrecompiledAddressesBerlin
+		activePrecompiles = PrecompiledContractsBerlin
 	case rules.IsIstanbul:
-		return PrecompiledAddressesIstanbul
+		activePrecompiles = PrecompiledContractsIstanbul
 	case rules.IsByzantium:
-		return PrecompiledAddressesByzantium
+		activePrecompiles = PrecompiledContractsByzantium
 	default:
-		return PrecompiledAddressesHomestead
+		activePrecompiles = PrecompiledContractsHomestead
 	}
+
+	// [rollup-geth]
+	activeRollupPrecompiles := activeRollupPrecompiledContracts(rules)
+	for k, v := range activeRollupPrecompiles {
+		activePrecompiles[k] = v
+	}
+	activePrecompiles.ActivateRollupPrecompiledContracts(config)
+
+	return activePrecompiles
+}
+
+// ActivePrecompiledContracts returns a copy of precompiled contracts enabled with the current configuration.
+func ActivePrecompiledContracts(rules params.Rules, rollupConfig *RollupPrecompileActivationConfig) PrecompiledContracts {
+	return maps.Clone(activePrecompiledContracts(rules, rollupConfig))
+}
+
+// ActivePrecompiles returns the precompiles enabled with the current configuration.
+func ActivePrecompiles(rules params.Rules) []common.Address {
+	var activePrecompileAddresses []common.Address
+	switch {
+	case rules.IsStylus:
+		activePrecompileAddresses = PrecompiledAddressesArbOS30
+	case rules.IsArbitrum:
+		activePrecompileAddresses = PrecompiledAddressesArbitrum
+	case rules.IsCancun:
+		activePrecompileAddresses = PrecompiledAddressesCancun
+	case rules.IsBerlin:
+		activePrecompileAddresses = PrecompiledAddressesBerlin
+	case rules.IsIstanbul:
+		activePrecompileAddresses = PrecompiledAddressesIstanbul
+	case rules.IsByzantium:
+		activePrecompileAddresses = PrecompiledAddressesByzantium
+	default:
+		activePrecompileAddresses = PrecompiledAddressesHomestead
+	}
+	// [rollup-geth]
+	activePrecompileAddresses = append(activePrecompileAddresses, slices.Collect(maps.Keys(activeRollupPrecompiledContracts(rules)))...)
+
+	return activePrecompileAddresses
 }
 
 type AdvancedPrecompileCall struct {
@@ -256,6 +300,7 @@ type sha256hash struct{}
 func (c *sha256hash) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.Sha256PerWordGas + params.Sha256BaseGas
 }
+
 func (c *sha256hash) Run(input []byte) ([]byte, error) {
 	h := sha256.Sum256(input)
 	return h[:], nil
@@ -271,6 +316,7 @@ type ripemd160hash struct{}
 func (c *ripemd160hash) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.Ripemd160PerWordGas + params.Ripemd160BaseGas
 }
+
 func (c *ripemd160hash) Run(input []byte) ([]byte, error) {
 	ripemd := ripemd160.New()
 	ripemd.Write(input)
@@ -287,6 +333,7 @@ type dataCopy struct{}
 func (c *dataCopy) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.IdentityPerWordGas + params.IdentityBaseGas
 }
+
 func (c *dataCopy) Run(in []byte) ([]byte, error) {
 	return common.CopyBytes(in), nil
 }
@@ -439,7 +486,7 @@ func (c *bigModExp) Run(input []byte) ([]byte, error) {
 		// Modulo 0 is undefined, return zero
 		return common.LeftPadBytes([]byte{}, int(modLen)), nil
 	case base.BitLen() == 1: // a bit length of 1 means it's 1 (or -1).
-		//If base == 1, then we can just return base % mod (if mod >= 1, which it is)
+		// If base == 1, then we can just return base % mod (if mod >= 1, which it is)
 		v = base.Mod(base, mod).Bytes()
 	default:
 		v = base.Exp(base, exp, mod).Bytes()

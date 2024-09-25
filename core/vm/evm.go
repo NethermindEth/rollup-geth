@@ -133,6 +133,8 @@ type EVM struct {
 	// available gas is calculated in gasCall* according to the 63/64 rule and later
 	// applied in opCall*.
 	callGasTemp uint64
+	// precompiles holds the precompiled contracts for the current epoch
+	precompiles PrecompiledContracts
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -158,6 +160,10 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 		chainConfig: chainConfig,
 		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil, blockCtx.Time, blockCtx.ArbOSVersion),
 	}
+
+	//[rollup-geth]
+	evm.precompiles = activePrecompiledContracts(evm.chainRules, generateRollupPrecompiledContractsOverrides(evm))
+	
 	evm.ProcessingHook = DefaultTxProcessor{evm: evm}
 	evm.interpreter = NewEVMInterpreter(evm)
 	return evm

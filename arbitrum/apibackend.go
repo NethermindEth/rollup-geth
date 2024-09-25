@@ -670,7 +670,7 @@ func (a *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscripti
 }
 
 func (a *APIBackend) SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription {
-	//Arbitrum doesn't really need pending logs. Logs are published as soon as we know them..
+	// Arbitrum doesn't really need pending logs. Logs are published as soon as we know them..
 	return a.SubscribeLogsEvent(ch)
 }
 
@@ -692,4 +692,8 @@ func (b *APIBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
 
 func (b *APIBackend) FallbackClient() types.FallbackClient {
 	return b.fallbackClient
+}
+
+func (b *APIBackend) GetL1RpcClient() vm.L1RpcClient {
+	return b.BlockChain().GetVMConfig().L1RpcClient
 }

@@ -58,7 +58,7 @@ func newTestBackend(t *testing.T) (*node.Node, []*types.Block) {
 	}
 	// Create Ethereum Service
 	config := &ethconfig.Config{Genesis: genesis}
-	ethservice, err := eth.New(n, config)
+	ethservice, err := eth.New(n, config, "")
 	if err != nil {
 		t.Fatalf("can't create new ethereum service: %v", err)
 	}
@@ -111,37 +111,48 @@ func TestGethClient(t *testing.T) {
 		{
 			"TestGetProof1",
 			func(t *testing.T) { testGetProof(t, client, testAddr) },
-		}, {
+		},
+		{
 			"TestGetProof2",
 			func(t *testing.T) { testGetProof(t, client, testContract) },
-		}, {
+		},
+		{
 			"TestGetProofEmpty",
 			func(t *testing.T) { testGetProof(t, client, testEmpty) },
-		}, {
+		},
+		{
 			"TestGetProofNonExistent",
 			func(t *testing.T) { testGetProofNonExistent(t, client) },
-		}, {
+		},
+		{
 			"TestGetProofCanonicalizeKeys",
 			func(t *testing.T) { testGetProofCanonicalizeKeys(t, client) },
-		}, {
+		},
+		{
 			"TestGCStats",
 			func(t *testing.T) { testGCStats(t, client) },
-		}, {
+		},
+		{
 			"TestMemStats",
 			func(t *testing.T) { testMemStats(t, client) },
-		}, {
+		},
+		{
 			"TestGetNodeInfo",
 			func(t *testing.T) { testGetNodeInfo(t, client) },
-		}, {
+		},
+		{
 			"TestSubscribePendingTxHashes",
 			func(t *testing.T) { testSubscribePendingTransactions(t, client) },
-		}, {
+		},
+		{
 			"TestSubscribePendingTxs",
 			func(t *testing.T) { testSubscribeFullPendingTransactions(t, client) },
-		}, {
+		},
+		{
 			"TestCallContract",
 			func(t *testing.T) { testCallContract(t, client) },
-		}, {
+		},
+		{
 			"TestCallContractWithBlockOverrides",
 			func(t *testing.T) { testCallContractWithBlockOverrides(t, client) },
 		},
@@ -152,7 +163,8 @@ func TestGethClient(t *testing.T) {
 		{
 			"TestAccessList",
 			func(t *testing.T) { testAccessList(t, client) },
-		}, {
+		},
+		{
 			"TestSetHead",
 			func(t *testing.T) { testSetHead(t, client) },
 		},
