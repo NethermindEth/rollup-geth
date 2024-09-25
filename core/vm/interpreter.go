@@ -17,7 +17,9 @@
 package vm
 
 import (
+	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -34,7 +36,13 @@ type Config struct {
 	EnablePreimageRecording bool  // Enables recording of SHA3/keccak preimages
 	ExtraEips               []int // Additional EIPS that are to be enabled
 
-	StatelessSelfValidation bool // Generate execution witnesses and self-check against them (testing purpose)
+	StatelessSelfValidation bool     // Generate execution witnesses and self-check against them (testing purpose)
+	L1RpcClient             L1Client //[rollup-geth]
+}
+
+// [rollup-geth]
+type L1Client interface {
+	StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error)
 }
 
 // ScopeContext contains the things that are per-call, such as stack and memory,

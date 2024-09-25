@@ -156,6 +156,9 @@ type Config struct {
 
 	// OverrideVerkle (TODO: remove after the fork)
 	OverrideVerkle *uint64 `toml:",omitempty"`
+
+	//[rollup-geth]
+	L1NodeRPCEndpoint string
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain config.
