@@ -11,16 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
-type RollupPrecompiledContractsOverrides struct {
-	l1SLoadGetLatestL1Block func() *big.Int
-}
-
-func GenerateRollupPrecompiledContractsOverrides(evm *EVM) RollupPrecompiledContractsOverrides {
-	return RollupPrecompiledContractsOverrides{
-		l1SLoadGetLatestL1Block: getLatestL1BlockNumber(evm),
-	}
-}
-
 var rollupL1SloadAddress = common.BytesToAddress([]byte{0x10, 0x01})
 
 var PrecompiledContractsRollupR0 = PrecompiledContracts{
@@ -37,11 +27,6 @@ func activeRollupPrecompiledContracts(rules params.Rules) PrecompiledContracts {
 }
 
 func (evm *EVM) activateRollupPrecompiledContracts() {
-	activeRollupPrecompiles := activeRollupPrecompiledContracts(evm.chainRules)
-	for k, v := range activeRollupPrecompiles {
-		evm.precompiles[k] = v
-	}
-
 	// NOTE: if L1SLoad was not activated via chain rules this is no-op
 	evm.precompiles.activateL1SLoad(evm.Config.L1RpcClient, evm.rollupPrecompileOverrides.l1SLoadGetLatestL1Block)
 }
