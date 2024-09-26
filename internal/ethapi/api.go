@@ -256,7 +256,7 @@ func (api *TxPoolAPI) Inspect() map[string]map[string]map[string]string {
 	pending, queue := api.b.TxPoolContent()
 
 	// Define a formatter to flatten a transaction into a string
-	var format = func(tx *types.Transaction) string {
+	format := func(tx *types.Transaction) string {
 		if to := tx.To(); to != nil {
 			return fmt.Sprintf("%s: %v wei + %v gas × %v wei", tx.To().Hex(), tx.Value(), tx.Gas(), tx.GasPrice())
 		}
@@ -1166,6 +1166,12 @@ func doCall(ctx context.Context, b Backend, args TransactionArgs, state *state.S
 	}
 	rules := b.ChainConfig().Rules(blockCtx.BlockNumber, blockCtx.Random != nil, blockCtx.Time)
 	precompiles := maps.Clone(vm.ActivePrecompiledContracts(rules))
+
+	//[rollup-geth] This is optional for rollups
+	precompiles.ActivateRollupPrecompiledContracts(vm.RollupPrecompileActivationConfig{
+		vm.L1SLoad{L1RpcClient: b.GetL1RpcClient(), GetLatestL1BlockNumber: func() *big.Int { return blockCtx.BlockNumber }},
+	})
+
 	if err := overrides.Apply(state, precompiles); err != nil {
 		return nil, err
 	}
@@ -2100,11 +2106,11 @@ func (api *TransactionAPI) Resend(ctx context.Context, sendArgs TransactionArgs,
 	matchTx := sendArgs.ToTransaction(types.LegacyTxType)
 
 	// Before replacing the old transaction, ensure the _new_ transaction fee is reasonable.
-	var price = matchTx.GasPrice()
+	price := matchTx.GasPrice()
 	if gasPrice != nil {
 		price = gasPrice.ToInt()
 	}
-	var gas = matchTx.Gas()
+	gas := matchTx.Gas()
 	if gasLimit != nil {
 		gas = uint64(*gasLimit)
 	}
