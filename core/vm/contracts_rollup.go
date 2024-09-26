@@ -11,14 +11,20 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
+type RollupPrecompiledContractsOverrides struct {
+	l1SLoadGetLatestL1Block func() *big.Int
+}
+
+func GenerateRollupPrecompiledContractsOverrides(evm *EVM) RollupPrecompiledContractsOverrides {
+	return RollupPrecompiledContractsOverrides{
+		l1SLoadGetLatestL1Block: getLatestL1BlockNumber(evm),
+	}
+}
+
 var rollupL1SloadAddress = common.BytesToAddress([]byte{0x10, 0x01})
 
 var PrecompiledContractsRollupR0 = PrecompiledContracts{
-	rollupL1SloadAddress: &L1SLoad{},
-}
-
-type RollupPrecompileActivationConfig struct {
-	L1SLoad
+	rollupL1SloadAddress: &l1SLoad{},
 }
 
 func activeRollupPrecompiledContracts(rules params.Rules) PrecompiledContracts {
@@ -30,25 +36,24 @@ func activeRollupPrecompiledContracts(rules params.Rules) PrecompiledContracts {
 	}
 }
 
-func (pc *PrecompiledContracts) ActivateRollupPrecompiledContracts(config RollupPrecompileActivationConfig) {
-	// NOTE: if L1SLoad was not activated via chain rules this is no-op
-	pc.activateL1SLoad(config.L1RpcClient, config.GetLatestL1BlockNumber)
-}
-
 func (evm *EVM) activateRollupPrecompiledContracts() {
-	evm.precompiles.ActivateRollupPrecompiledContracts(RollupPrecompileActivationConfig{
-		L1SLoad{L1RpcClient: evm.Config.L1RpcClient, GetLatestL1BlockNumber: evm.rollupPrecompileOverrides.l1SLoadGetLatestL1Block},
-	})
+	activeRollupPrecompiles := activeRollupPrecompiledContracts(evm.chainRules)
+	for k, v := range activeRollupPrecompiles {
+		evm.precompiles[k] = v
+	}
+
+	// NOTE: if L1SLoad was not activated via chain rules this is no-op
+	evm.precompiles.activateL1SLoad(evm.Config.L1RpcClient, evm.rollupPrecompileOverrides.l1SLoadGetLatestL1Block)
 }
 
-type L1SLoad struct {
-	L1RpcClient            L1RpcClient
-	GetLatestL1BlockNumber func() *big.Int
+type l1SLoad struct {
+	l1RpcClient            L1Client
+	getLatestL1BlockNumber func() *big.Int
 }
 
-func (c *L1SLoad) RequiredGas(input []byte) uint64 { return 0 }
+func (c *l1SLoad) RequiredGas(input []byte) uint64 { return 0 }
 
-func (c *L1SLoad) Run(input []byte) ([]byte, error) {
+func (c *l1SLoad) Run(input []byte) ([]byte, error) {
 	if !c.isL1SLoadActive() {
 		return nil, errors.New("L1SLoad precompile not active")
 	}
@@ -56,18 +61,15 @@ func (c *L1SLoad) Run(input []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (c *L1SLoad) isL1SLoadActive() bool {
-	return c.GetLatestL1BlockNumber != nil && c.L1RpcClient != nil
+func (c *l1SLoad) isL1SLoadActive() bool {
+	return c.getLatestL1BlockNumber != nil && c.l1RpcClient != nil
 }
 
-func (pc *PrecompiledContracts) activateL1SLoad(l1RpcClient L1RpcClient, getLatestL1BlockNumber func() *big.Int) {
-	rulesSayContractShouldBeActive := (*pc)[rollupL1SloadAddress] != nil
-	paramsNotNil := l1RpcClient != nil && getLatestL1BlockNumber != nil
-
-	if shouldActivateL1SLoad := rulesSayContractShouldBeActive && paramsNotNil; shouldActivateL1SLoad {
-		(*pc)[rollupL1SloadAddress] = &L1SLoad{
-			L1RpcClient:            l1RpcClient,
-			GetLatestL1BlockNumber: getLatestL1BlockNumber,
+func (pc *PrecompiledContracts) activateL1SLoad(l1RpcClient L1Client, getLatestL1BlockNumber func() *big.Int) {
+	if (*pc)[rollupL1SloadAddress] != nil {
+		(*pc)[rollupL1SloadAddress] = &l1SLoad{
+			l1RpcClient:            l1RpcClient,
+			getLatestL1BlockNumber: getLatestL1BlockNumber,
 		}
 	}
 }
