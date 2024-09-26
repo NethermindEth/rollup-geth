@@ -14,43 +14,45 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
-var rollupL1SloadAddress = common.BytesToAddress([]byte{0x10, 0x01})
-
-var PrecompiledContractsRollupR0 = PrecompiledContracts{
-	rollupL1SloadAddress: &L1SLoad{},
-}
-
 type RollupPrecompileActivationConfig struct {
 	L1SLoad
+}
+
+type L1RpcClient interface {
+	StoragesAt(ctx context.Context, account common.Address, keys []common.Hash, blockNumber *big.Int) ([]byte, error)
+}
+
+var rollupL1SloadAddress = common.BytesToAddress([]byte{0x10, 0x01})
+var precompiledContractsRollupR0 = PrecompiledContracts{
+	rollupL1SloadAddress: &L1SLoad{},
 }
 
 func activeRollupPrecompiledContracts(rules params.Rules) PrecompiledContracts {
 	switch rules.IsR0 {
 	case rules.IsR0:
-		return PrecompiledContractsRollupR0
+		return precompiledContractsRollupR0
 	default:
 		return nil
 	}
 }
 
-func (pc *PrecompiledContracts) ActivateRollupPrecompiledContracts(config RollupPrecompileActivationConfig) {
+// ActivateRollupPrecompiledContracts activates rollup-specific precompiles
+func (pc PrecompiledContracts) ActivateRollupPrecompiledContracts(config *RollupPrecompileActivationConfig) {
+	if config == nil {
+		return
+	}
+
 	// NOTE: if L1SLoad was not activated via chain rules this is no-op
 	pc.activateL1SLoad(config.L1RpcClient, config.GetLatestL1BlockNumber)
-}
-
-func (evm *EVM) activateRollupPrecompiledContracts() {
-	evm.precompiles.ActivateRollupPrecompiledContracts(RollupPrecompileActivationConfig{
-		L1SLoad{L1RpcClient: evm.Config.L1RpcClient, GetLatestL1BlockNumber: evm.rollupPrecompileOverrides.l1SLoadGetLatestL1Block},
-	})
 }
 
 //INPUT SPECS:
 //Byte range          Name              Description
 //------------------------------------------------------------
-//[0: 19] (20 bytes)	address	          The contract address
-//[20: 51] (32 bytes)	key1	            The storage key
+//[0: 19] (20 bytes)	address			The contract address
+//[20: 51] (32 bytes)	key1			The storage key
 //...	...	...
-//[k*32-12: k*32+19]  (32 bytes)	key_k	The storage key
+//[k*32-12: k*32+19]	(32 bytes)key_k	The storage key
 
 type L1SLoad struct {
 	L1RpcClient            L1RpcClient
@@ -111,13 +113,15 @@ func (c *L1SLoad) isL1SLoadActive() bool {
 }
 
 func (pc PrecompiledContracts) activateL1SLoad(l1RpcClient L1RpcClient, getLatestL1BlockNumber func() *big.Int) {
-	rulesSayContractShouldBeActive := pc[rollupL1SloadAddress] != nil
-	paramsNotNil := l1RpcClient != nil && getLatestL1BlockNumber != nil
+	if paramsAreNil := l1RpcClient == nil || getLatestL1BlockNumber == nil; paramsAreNil {
+		return
+	}
+	if precompileNotRuleActivated := pc[rollupL1SloadAddress] == nil; precompileNotRuleActivated {
+		return
+	}
 
-	if shouldActivateL1SLoad := rulesSayContractShouldBeActive && paramsNotNil; shouldActivateL1SLoad {
-		pc[rollupL1SloadAddress] = &L1SLoad{
-			L1RpcClient:            l1RpcClient,
-			GetLatestL1BlockNumber: getLatestL1BlockNumber,
-		}
+	pc[rollupL1SloadAddress] = &L1SLoad{
+		L1RpcClient:            l1RpcClient,
+		GetLatestL1BlockNumber: getLatestL1BlockNumber,
 	}
 }
