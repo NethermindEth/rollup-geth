@@ -561,6 +561,7 @@ func (c *ChainConfig) IsEIP4762(num *big.Int, time uint64) bool {
 	return c.IsVerkle(num, time)
 }
 
+// [rollup-geth]
 // IsEIP7708 returns whether [EIP-7708](https://eips.ethereum.org/EIPS/eip-7708) has been activated at given block.
 func (c *ChainConfig) IsEIP7708(num *big.Int, time uint64) bool {
 	// TODO:Decide how to activate this EIP
@@ -900,7 +901,8 @@ type Rules struct {
 	IsBerlin, IsLondon                                      bool
 	IsMerge, IsShanghai, IsCancun, IsPrague                 bool
 	IsVerkle                                                bool
-	IsEIP7708                                               bool
+	IsR0                                                    bool // [rollup-geth]
+	IsEIP7708                                               bool // [rollup-geth]
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -932,5 +934,7 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsVerkle:         isVerkle,
 		IsEIP4762:        isVerkle,
 		IsEIP7708:        c.IsEIP7708(num, timestamp),
+		// TODO: "true" is hardcoded here, think about how to activate Rollup "features"
+		IsR0: true, // [rollup-geth]
 	}
 }
