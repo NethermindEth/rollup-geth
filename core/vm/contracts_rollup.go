@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -90,8 +91,16 @@ func (c *L1SLoad) Run(input []byte) ([]byte, error) {
 
 	// TODO:
 	// 1. Batch multiple storage slots
-	// 2. What about timeout strategy here?
-	res, err := c.L1RpcClient.StorageAt(context.Background(), contractAddress, contractStorageKeys[0], c.GetLatestL1BlockNumber())
+	var ctx context.Context
+	if params.L1SLoadRPCTimeoutInSec > 0 {
+		c, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(params.L1SLoadRPCTimeoutInSec))
+		ctx = c
+		defer cancel()
+	} else {
+		ctx = context.Background()
+	}
+
+	res, err := c.L1RpcClient.StorageAt(ctx, contractAddress, contractStorageKeys[0], c.GetLatestL1BlockNumber())
 	if err != nil {
 		return nil, err
 	}
