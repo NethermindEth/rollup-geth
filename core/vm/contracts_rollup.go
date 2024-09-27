@@ -89,8 +89,6 @@ func (c *L1SLoad) Run(input []byte) ([]byte, error) {
 		contractStorageKeys[k] = common.BytesToHash(input[k*common.HashLength : (k+1)*common.HashLength])
 	}
 
-	// TODO:
-	// 1. Batch multiple storage slots
 	var ctx context.Context
 	if params.L1SLoadRPCTimeoutInSec > 0 {
 		c, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(params.L1SLoadRPCTimeoutInSec))
