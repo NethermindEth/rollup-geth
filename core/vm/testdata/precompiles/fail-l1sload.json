@@ -1,0 +1,16 @@
+[
+  {
+    "Name": "L1SLOAD FAIL: input contains only address",
+    "Input": "a83114A443dA1CecEFC50368531cACE9F37fCCcb",
+    "ExpectedError": "L1SLOAD input too short",
+    "Gas": 4000,
+    "NoBenchmark": true
+  },
+  {
+    "Name": "L1SLOAD FAIL: input key not 32 bytes",
+    "Input": "a83114A443dA1CecEFC50368531cACE9F37fCCcb112d016b65e9c617ad9ab60604f772a3620177bada4cdc773d9b6a982d3c2a7122",
+    "ExpectedError": "L1SLOAD input is malformed",
+    "Gas": 4000,
+    "NoBenchmark": true
+  }
+]

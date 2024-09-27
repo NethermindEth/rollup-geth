@@ -100,7 +100,7 @@ func (c *L1SLoad) Run(input []byte) ([]byte, error) {
 		ctx = context.Background()
 	}
 
-	res, err := c.L1RpcClient.StorageAt(ctx, contractAddress, contractStorageKeys[0], c.GetLatestL1BlockNumber())
+	res, err := c.L1RpcClient.StoragesAt(ctx, contractAddress, contractStorageKeys, c.GetLatestL1BlockNumber())
 	if err != nil {
 		return nil, err
 	}
