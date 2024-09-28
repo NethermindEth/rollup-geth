@@ -78,7 +78,7 @@ func (c *L1SLoad) Run(input []byte) ([]byte, error) {
 	thereIsAtLeast1StorageKeyToRead := countOfStorageKeysToRead > 0
 	allStorageKeysAreExactly32Bytes := countOfStorageKeysToRead*common.HashLength == len(input)-common.AddressLength
 
-	if inputIsValid := thereIsAtLeast1StorageKeyToRead && allStorageKeysAreExactly32Bytes; !inputIsValid {
+	if inputIsInvalid := !(thereIsAtLeast1StorageKeyToRead && allStorageKeysAreExactly32Bytes); inputIsInvalid {
 		return nil, errors.New("L1SLOAD input is malformed")
 	}
 
