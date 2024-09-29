@@ -951,14 +951,6 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Value:    metrics.DefaultConfig.InfluxDBOrganization,
 		Category: flags.MetricsCategory,
 	}
-
-	//[rollup-geth]
-	L1NodeRPCEndpointFlag = &cli.StringFlag{
-		Name:     "rollup.l1.rpc_endpoint",
-		Usage:    "L1 node RPC endpoint eg. http://0.0.0.0:8545",
-		Category: flags.RollupCategory,
-		Required: true,
-	}
 )
 
 var (
@@ -1256,15 +1248,6 @@ func setLes(ctx *cli.Context, cfg *ethconfig.Config) {
 	}
 	if ctx.IsSet(LightNoSyncServeFlag.Name) {
 		log.Warn("The light server has been deprecated, please remove this flag", "flag", LightNoSyncServeFlag.Name)
-	}
-}
-
-// [rollup-geth]
-func setRollupEthConfig(ctx *cli.Context, cfg *ethconfig.Config) {
-	if ctx.IsSet(L1NodeRPCEndpointFlag.Name) {
-		cfg.L1NodeRPCEndpoint = ctx.String(L1NodeRPCEndpointFlag.Name)
-	} else {
-		log.Crit("L1 node RPC endpoint URL not set", "flag", L1NodeRPCEndpointFlag.Name)
 	}
 }
 
