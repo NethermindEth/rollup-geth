@@ -1651,9 +1651,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setRequiredBlocks(ctx, cfg)
 	setLes(ctx, cfg)
 
-	//[rollup-geth]
-	setRollupEthConfig(ctx, cfg)
-
 	// Cap the cache allowance and tune the garbage collector
 	mem, err := gopsutil.VirtualMemory()
 	if err == nil {
@@ -1928,8 +1925,8 @@ func SetDNSDiscoveryDefaults(cfg *ethconfig.Config, genesis common.Hash) {
 
 // RegisterEthService adds an Ethereum client to the stack.
 // The second return value is the full node instance.
-func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (*eth.EthAPIBackend, *eth.Ethereum) {
-	backend, err := eth.New(stack, cfg)
+func RegisterEthService(stack *node.Node, cfg *ethconfig.Config, l1RPCClientEndpoint string) (*eth.EthAPIBackend, *eth.Ethereum) {
+	backend, err := eth.New(stack, cfg, l1RPCClientEndpoint)
 	if err != nil {
 		Fatalf("Failed to register the Ethereum service: %v", err)
 	}

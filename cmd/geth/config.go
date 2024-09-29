@@ -192,7 +192,12 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 		cfg.Eth.OverrideVerkle = &v
 	}
 
-	backend, eth := utils.RegisterEthService(stack, &cfg.Eth)
+	// [rollup-geth]
+	// TODO: think about if there is better solution for this (eg. rollup config file)
+	if !ctx.IsSet(utils.L1NodeRPCEndpointFlag.Name) {
+		log.Crit("L1 node RPC endpoint URL not set", "flag", utils.L1NodeRPCEndpointFlag.Name)
+	}
+	backend, eth := utils.RegisterEthService(stack, &cfg.Eth, ctx.String(utils.L1NodeRPCEndpointFlag.Name))
 
 	// Create gauge with geth system and build information
 	if eth != nil { // The 'eth' backend may be nil in light mode
