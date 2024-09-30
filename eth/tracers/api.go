@@ -967,7 +967,7 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 		rollupsConfig := vm.RollupPrecompileActivationConfig{
 			L1SLoad: vm.L1SLoad{
 				L1RpcClient:            api.backend.GetL1RpcClient(),
-				GetLatestL1BlockNumber: func() *big.Int { return vmctx.BlockNumber }
+				GetLatestL1BlockNumber: func() *big.Int { return vmctx.BlockNumber },
 			},
 		}
 		precompiles := vm.ActivePrecompiledContracts(rules, &rollupsConfig)
