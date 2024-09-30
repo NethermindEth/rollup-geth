@@ -5,13 +5,13 @@ package vm
 
 import "math/big"
 
-type RollupPrecompiledContractsOverrides struct {
-	l1SLoadGetLatestL1Block func() *big.Int
-}
-
-func GenerateRollupPrecompiledContractsOverrides(evm *EVM) RollupPrecompiledContractsOverrides {
-	return RollupPrecompiledContractsOverrides{
-		l1SLoadGetLatestL1Block: getLatestL1BlockNumber(evm),
+// generateRollupPrecompiledContractsOverrides generates rollup precompile config inlucing L2 specific overrides
+func generateRollupPrecompiledContractsOverrides(evm *EVM) *RollupPrecompileActivationConfig {
+	return &RollupPrecompileActivationConfig{
+		L1SLoad{
+			L1RpcClient:            evm.Config.L1RpcClient,
+			GetLatestL1BlockNumber: getLatestL1BlockNumber(evm),
+		},
 	}
 }
 

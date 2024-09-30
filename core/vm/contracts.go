@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"maps"
 	"math/big"
+	"slices"
 
 	"github.com/consensys/gnark-crypto/ecc"
 	bls12381 "github.com/consensys/gnark-crypto/ecc/bls12-381"
@@ -173,7 +174,7 @@ func init() {
 	}
 }
 
-func activePrecompiledContracts(rules params.Rules) PrecompiledContracts {
+func activePrecompiledContracts(rules params.Rules, config *RollupPrecompileActivationConfig) PrecompiledContracts {
 	var activePrecompiles PrecompiledContracts
 	switch {
 	case rules.IsVerkle:
@@ -197,31 +198,39 @@ func activePrecompiledContracts(rules params.Rules) PrecompiledContracts {
 	for k, v := range activeRollupPrecompiles {
 		activePrecompiles[k] = v
 	}
+	activePrecompiles.ActivateRollupPrecompiledContracts(config)
 
 	return activePrecompiles
 }
 
 // ActivePrecompiledContracts returns a copy of precompiled contracts enabled with the current configuration.
-func ActivePrecompiledContracts(rules params.Rules) PrecompiledContracts {
-	return maps.Clone(activePrecompiledContracts(rules))
+func ActivePrecompiledContracts(rules params.Rules, rollupConfig *RollupPrecompileActivationConfig) PrecompiledContracts {
+	return maps.Clone(activePrecompiledContracts(rules, rollupConfig))
 }
 
 // ActivePrecompiles returns the precompile addresses enabled with the current configuration.
 func ActivePrecompiles(rules params.Rules) []common.Address {
+	var activePrecompileAddresses []common.Address
 	switch {
 	case rules.IsPrague:
-		return PrecompiledAddressesPrague
+		activePrecompileAddresses = PrecompiledAddressesPrague
 	case rules.IsCancun:
-		return PrecompiledAddressesCancun
+		activePrecompileAddresses = PrecompiledAddressesCancun
 	case rules.IsBerlin:
-		return PrecompiledAddressesBerlin
+		activePrecompileAddresses = PrecompiledAddressesBerlin
 	case rules.IsIstanbul:
-		return PrecompiledAddressesIstanbul
+		activePrecompileAddresses = PrecompiledAddressesIstanbul
 	case rules.IsByzantium:
-		return PrecompiledAddressesByzantium
+		activePrecompileAddresses = PrecompiledAddressesByzantium
 	default:
-		return PrecompiledAddressesHomestead
+		activePrecompileAddresses = PrecompiledAddressesHomestead
 	}
+
+	// [rollup-geth]
+	activePrecompileAddresses =
+		append(activePrecompileAddresses, slices.Collect(maps.Keys(activeRollupPrecompiledContracts(rules)))...)
+
+	return activePrecompileAddresses
 }
 
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.

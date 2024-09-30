@@ -286,12 +286,15 @@ func (sim *simulator) activePrecompiles(base *types.Header) vm.PrecompiledContra
 		isMerge = base.Difficulty.Sign() == 0
 		rules   = sim.chainConfig.Rules(base.Number, isMerge, base.Time)
 	)
-	precompiles := vm.ActivePrecompiledContracts(rules)
-
-	//[rollup-geth] This is optional for rollups
-	precompiles.ActivateRollupPrecompiledContracts(vm.RollupPrecompileActivationConfig{
-		L1SLoad: vm.L1SLoad{L1RpcClient: sim.b.GetL1RpcClient(), GetLatestL1BlockNumber: func() *big.Int { return base.Number }},
-	})
+	//[rollup-geth] This is optional for rollups, instead we can simply do
+	// rollupsConfig := nil
+	rollupsConfig := vm.RollupPrecompileActivationConfig{
+		L1SLoad: vm.L1SLoad{
+			L1RpcClient:            sim.b.GetL1RpcClient(),
+			GetLatestL1BlockNumber: func() *big.Int { return base.Number },
+		},
+	}
+	precompiles := vm.ActivePrecompiledContracts(rules, &rollupsConfig)
 
 	return maps.Clone(precompiles)
 }
