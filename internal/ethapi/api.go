@@ -1166,12 +1166,14 @@ func doCall(ctx context.Context, b Backend, args TransactionArgs, state *state.S
 	}
 	rules := b.ChainConfig().Rules(blockCtx.BlockNumber, blockCtx.Random != nil, blockCtx.Time)
 
-	//[rollup-geth] This is optional for rollups, instead we can simply do
-	// rollupsConfig := nil
+	//[rollup-geth]
+	// The way code is organized (check call to applyMessage) this config supersedes
+	// the evm config
 	rollupConfig := vm.RollupPrecompileActivationConfig{
 		L1SLoad: vm.L1SLoad{
 			L1RpcClient:            b.GetL1RpcClient(),
-			GetLatestL1BlockNumber: func() *big.Int { return blockCtx.BlockNumber }},
+			GetLatestL1BlockNumber: vm.LetRPCDecideLatestL1Number(),
+		},
 	}
 	precompiles := maps.Clone(vm.ActivePrecompiledContracts(rules, &rollupConfig))
 

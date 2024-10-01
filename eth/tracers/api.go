@@ -962,12 +962,11 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 		config.BlockOverrides.Apply(&vmctx)
 		rules := api.backend.ChainConfig().Rules(vmctx.BlockNumber, vmctx.Random != nil, vmctx.Time)
 
-		//[rollup-geth] This is optional for rollups, instead we can simply do
-		// rollupsConfig := nil
+		//[rollup-geth]
 		rollupsConfig := vm.RollupPrecompileActivationConfig{
 			L1SLoad: vm.L1SLoad{
 				L1RpcClient:            api.backend.GetL1RpcClient(),
-				GetLatestL1BlockNumber: func() *big.Int { return vmctx.BlockNumber },
+				GetLatestL1BlockNumber: vm.LetRPCDecideLatestL1Number(),
 			},
 		}
 		precompiles := vm.ActivePrecompiledContracts(rules, &rollupsConfig)
