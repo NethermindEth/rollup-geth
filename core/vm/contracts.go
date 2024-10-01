@@ -21,8 +21,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
-	"slices"
 
 	"github.com/consensys/gnark-crypto/ecc"
 	bls12381 "github.com/consensys/gnark-crypto/ecc/bls12-381"
@@ -218,7 +218,7 @@ func activePrecompiledContracts(rules params.Rules, config *RollupPrecompileActi
 	var activePrecompiles PrecompiledContracts
 	switch {
 	case rules.IsOptimismGranite:
-		activePrecompiles = PrecompiledAddressesGranite
+		activePrecompiles = PrecompiledContractsGranite
 	case rules.IsOptimismFjord:
 		activePrecompiles = PrecompiledContractsFjord
 	case rules.IsVerkle:
@@ -259,7 +259,7 @@ func ActivePrecompiles(rules params.Rules) []common.Address {
 	case rules.IsOptimismGranite:
 		activePrecompileAddresses = PrecompiledAddressesGranite
 	case rules.IsOptimismFjord:
-		 activePrecompileAddresses = PrecompiledAddressesFjord
+		activePrecompileAddresses = PrecompiledAddressesFjord
 	case rules.IsPrague:
 		activePrecompileAddresses = PrecompiledAddressesPrague
 	case rules.IsCancun:
@@ -275,8 +275,9 @@ func ActivePrecompiles(rules params.Rules) []common.Address {
 	}
 
 	// [rollup-geth]
-	activePrecompileAddresses =
-		append(activePrecompileAddresses, slices.Collect(maps.Keys(activeRollupPrecompiledContracts(rules)))...)
+	for k := range activeRollupPrecompiledContracts(rules) {
+		activePrecompileAddresses = append(activePrecompileAddresses, k)
+	}
 
 	return activePrecompileAddresses
 }

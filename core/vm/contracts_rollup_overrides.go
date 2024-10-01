@@ -5,8 +5,6 @@ package vm
 
 import (
 	"math/big"
-
-	"github.com/ethereum/go-ethereum/core/state"
 )
 
 // generateRollupPrecompiledContractsOverrides generates rollup precompile config including L2 specific overrides
@@ -33,10 +31,9 @@ func LetRPCDecideLatestL1Number() func() *big.Int {
 // correct latest L1 block number
 //
 // EXAMPLE 2
-func GetLatestL1BlockNumber(state *state.StateDB) func() *big.Int {
-	return func() *big.Int {
-		addressOfL1BlockContract := common.Address{}
-		slotInContractRepresentingL1BlockNumber := common.Hash{}
-		return state.GetState(addressOfL1BlockContract, slotInContractRepresentingL1BlockNumber).Big()
-	}
-}
+// func GetLatestL1BlockNumber(state *state.StateDB) func() *big.Int { return func() *big.Int {
+// 		addressOfL1BlockContract := common.Address{}
+// 		slotInContractRepresentingL1BlockNumber := common.Hash{}
+// 		return state.GetState(addressOfL1BlockContract, slotInContractRepresentingL1BlockNumber).Big()
+// 	}
+// }
