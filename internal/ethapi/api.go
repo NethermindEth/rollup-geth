@@ -1165,17 +1165,15 @@ func doCall(ctx context.Context, b Backend, args TransactionArgs, state *state.S
 		blockOverrides.Apply(&blockCtx)
 	}
 	rules := b.ChainConfig().Rules(blockCtx.BlockNumber, blockCtx.Random != nil, blockCtx.Time)
-
+	precompiles := maps.Clone(vm.ActivePrecompiledContracts(rules))
 	//[rollup-geth]
-	// The way code is organized (check call to applyMessage) this config supersedes
-	// the evm config
 	rollupConfig := vm.RollupPrecompileActivationConfig{
 		L1SLoad: vm.L1SLoad{
 			L1RpcClient:            b.GetL1RpcClient(),
-			GetLatestL1BlockNumber: vm.LetRPCDecideLatestL1Number(),
+			GetLatestL1BlockNumber: vm.LetRPCDecideLatestL1Number,
 		},
 	}
-	precompiles := maps.Clone(vm.ActivePrecompiledContracts(rules, &rollupConfig))
+	precompiles.ActivateRollupPrecompiledContracts(rules, &rollupConfig)
 
 	if err := overrides.Apply(state, precompiles); err != nil {
 		return nil, err
@@ -1650,7 +1648,7 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 	}
 	isPostMerge := header.Difficulty.Sign() == 0
 	// Retrieve the precompiles since they don't need to be added to the access list
-	precompiles := vm.ActivePrecompiles(b.ChainConfig().Rules(header.Number, isPostMerge, header.Time))
+	precompiles := vm.ActivePrecompilesIncludingRollups(b.ChainConfig().Rules(header.Number, isPostMerge, header.Time))
 
 	// Create an initial tracer
 	prevTracer := logger.NewAccessListTracer(nil, args.from(), to, precompiles)

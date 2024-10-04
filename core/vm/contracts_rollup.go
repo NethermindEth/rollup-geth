@@ -22,10 +22,12 @@ type L1RpcClient interface {
 	StoragesAt(ctx context.Context, account common.Address, keys []common.Hash, blockNumber *big.Int) ([]byte, error)
 }
 
-var rollupL1SloadAddress = common.BytesToAddress([]byte{0x10, 0x01})
-var precompiledContractsRollupR0 = PrecompiledContracts{
-	rollupL1SloadAddress: &L1SLoad{},
-}
+var (
+	rollupL1SloadAddress         = common.BytesToAddress([]byte{0x10, 0x01})
+	precompiledContractsRollupR0 = PrecompiledContracts{
+		rollupL1SloadAddress: &L1SLoad{},
+	}
+)
 
 func activeRollupPrecompiledContracts(rules params.Rules) PrecompiledContracts {
 	switch rules.IsR0 {
@@ -37,13 +39,29 @@ func activeRollupPrecompiledContracts(rules params.Rules) PrecompiledContracts {
 }
 
 // ActivateRollupPrecompiledContracts activates rollup-specific precompiles
-func (pc PrecompiledContracts) ActivateRollupPrecompiledContracts(config *RollupPrecompileActivationConfig) {
+func (pc PrecompiledContracts) ActivateRollupPrecompiledContracts(rules params.Rules, config *RollupPrecompileActivationConfig) {
 	if config == nil {
 		return
 	}
 
+	activeRollupPrecompiles := activeRollupPrecompiledContracts(rules)
+	for k, v := range activeRollupPrecompiles {
+		pc[k] = v
+	}
+
 	// NOTE: if L1SLoad was not activated via chain rules this is no-op
 	pc.activateL1SLoad(config.L1RpcClient, config.GetLatestL1BlockNumber)
+}
+
+func ActivePrecompilesIncludingRollups(rules params.Rules) []common.Address {
+	activePrecompiles := ActivePrecompiles(rules)
+	activeRollupPrecompiles := activeRollupPrecompiledContracts(rules)
+
+	for k := range activeRollupPrecompiles {
+		activePrecompiles = append(activePrecompiles, k)
+	}
+
+	return activePrecompiles
 }
 
 //INPUT SPECS:

@@ -962,14 +962,16 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 		config.BlockOverrides.Apply(&vmctx)
 		rules := api.backend.ChainConfig().Rules(vmctx.BlockNumber, vmctx.Random != nil, vmctx.Time)
 
+		precompiles := vm.ActivePrecompiledContracts(rules)
+
 		//[rollup-geth]
 		rollupsConfig := vm.RollupPrecompileActivationConfig{
 			L1SLoad: vm.L1SLoad{
 				L1RpcClient:            api.backend.GetL1RpcClient(),
-				GetLatestL1BlockNumber: vm.LetRPCDecideLatestL1Number(),
+				GetLatestL1BlockNumber: vm.LetRPCDecideLatestL1Number,
 			},
 		}
-		precompiles := vm.ActivePrecompiledContracts(rules, &rollupsConfig)
+		precompiles.ActivateRollupPrecompiledContracts(rules, &rollupsConfig)
 
 		if err := config.StateOverrides.Apply(statedb, precompiles); err != nil {
 			return nil, err

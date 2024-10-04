@@ -12,7 +12,7 @@ func generateRollupPrecompiledContractsOverrides(evm *EVM) *RollupPrecompileActi
 	return &RollupPrecompileActivationConfig{
 		L1SLoad{
 			L1RpcClient:            evm.Config.L1RpcClient,
-			GetLatestL1BlockNumber: LetRPCDecideLatestL1Number(),
+			GetLatestL1BlockNumber: LetRPCDecideLatestL1Number,
 		},
 	}
 }
@@ -20,10 +20,8 @@ func generateRollupPrecompiledContractsOverrides(evm *EVM) *RollupPrecompileActi
 // [OVERRIDE]  LetRPCDecideLatestL1Number
 // Each rollup should override this function so that it returns
 // correct latest L1 block number
-func LetRPCDecideLatestL1Number() func() *big.Int {
-	return func() *big.Int {
-		return nil
-	}
+func LetRPCDecideLatestL1Number() *big.Int {
+	return nil
 }
 
 // [OVERRIDE]  getLatestL1BlockNumber
