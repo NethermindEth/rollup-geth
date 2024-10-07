@@ -42,7 +42,7 @@ type Config struct {
 
 // [rollup-geth]
 type L1RpcClient interface {
-	StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error)
+	StoragesAt(ctx context.Context, account common.Address, keys []common.Hash, blockNumber *big.Int) ([]byte, error)
 }
 
 // ScopeContext contains the things that are per-call, such as stack and memory,

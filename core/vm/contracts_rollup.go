@@ -4,10 +4,13 @@
 package vm
 
 import (
+	"context"
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -41,31 +44,78 @@ func (evm *EVM) activateRollupPrecompiledContracts() {
 	})
 }
 
+//INPUT SPECS:
+//Byte range          Name              Description
+//------------------------------------------------------------
+//[0: 19] (20 bytes)	address	          The contract address
+//[20: 51] (32 bytes)	key1	            The storage key
+//...	...	...
+//[k*32-12: k*32+19]  (32 bytes)	key_k	The storage key
+
 type L1SLoad struct {
 	L1RpcClient            L1RpcClient
 	GetLatestL1BlockNumber func() *big.Int
 }
 
-func (c *L1SLoad) RequiredGas(input []byte) uint64 { return 0 }
+func (c *L1SLoad) RequiredGas(input []byte) uint64 {
+	storageSlotsToLoad := len(input[common.AddressLength-1:]) / common.HashLength
+	storageSlotsToLoad = min(storageSlotsToLoad, params.L1SLoadMaxNumStorageSlots)
+
+	return params.L1SLoadBaseGas + uint64(storageSlotsToLoad)*params.L1SLoadPerLoadGas
+}
 
 func (c *L1SLoad) Run(input []byte) ([]byte, error) {
 	if !c.isL1SLoadActive() {
-		return nil, errors.New("L1SLoad precompile not active")
+		log.Error("L1SLOAD called, but not activated", "client", c.L1RpcClient, "and latest block number function", c.GetLatestL1BlockNumber)
+		return nil, errors.New("L1SLOAD precompile not active")
 	}
 
-	return nil, nil
+	if len(input) < common.AddressLength+common.HashLength {
+		return nil, errors.New("L1SLOAD input too short")
+	}
+
+	countOfStorageKeysToRead := (len(input) - common.AddressLength) / common.HashLength
+	thereIsAtLeast1StorageKeyToRead := countOfStorageKeysToRead > 0
+	allStorageKeysAreExactly32Bytes := countOfStorageKeysToRead*common.HashLength == len(input)-common.AddressLength
+
+	if inputIsInvalid := !(thereIsAtLeast1StorageKeyToRead && allStorageKeysAreExactly32Bytes); inputIsInvalid {
+		return nil, errors.New("L1SLOAD input is malformed")
+	}
+
+	contractAddress := common.BytesToAddress(input[:common.AddressLength])
+	input = input[common.AddressLength-1:]
+	contractStorageKeys := make([]common.Hash, countOfStorageKeysToRead)
+	for k := 0; k < countOfStorageKeysToRead; k++ {
+		contractStorageKeys[k] = common.BytesToHash(input[k*common.HashLength : (k+1)*common.HashLength])
+	}
+
+	var ctx context.Context
+	if params.L1SLoadRPCTimeoutInSec > 0 {
+		c, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(params.L1SLoadRPCTimeoutInSec))
+		ctx = c
+		defer cancel()
+	} else {
+		ctx = context.Background()
+	}
+
+	res, err := c.L1RpcClient.StoragesAt(ctx, contractAddress, contractStorageKeys, c.GetLatestL1BlockNumber())
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 func (c *L1SLoad) isL1SLoadActive() bool {
 	return c.GetLatestL1BlockNumber != nil && c.L1RpcClient != nil
 }
 
-func (pc *PrecompiledContracts) activateL1SLoad(l1RpcClient L1RpcClient, getLatestL1BlockNumber func() *big.Int) {
-	rulesSayContractShouldBeActive := (*pc)[rollupL1SloadAddress] != nil
+func (pc PrecompiledContracts) activateL1SLoad(l1RpcClient L1RpcClient, getLatestL1BlockNumber func() *big.Int) {
+	rulesSayContractShouldBeActive := pc[rollupL1SloadAddress] != nil
 	paramsNotNil := l1RpcClient != nil && getLatestL1BlockNumber != nil
 
 	if shouldActivateL1SLoad := rulesSayContractShouldBeActive && paramsNotNil; shouldActivateL1SLoad {
-		(*pc)[rollupL1SloadAddress] = &L1SLoad{
+		pc[rollupL1SloadAddress] = &L1SLoad{
 			L1RpcClient:            l1RpcClient,
 			GetLatestL1BlockNumber: getLatestL1BlockNumber,
 		}
