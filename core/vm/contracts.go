@@ -200,26 +200,20 @@ func ActivePrecompiledContracts(rules params.Rules) PrecompiledContracts {
 
 // ActivePrecompiles returns the precompile addresses enabled with the current configuration.
 func ActivePrecompiles(rules params.Rules) []common.Address {
-	var activePrecompileAddresses []common.Address
 	switch {
 	case rules.IsPrague:
-		activePrecompileAddresses = PrecompiledAddressesPrague
+		return PrecompiledAddressesPrague
 	case rules.IsCancun:
-		activePrecompileAddresses = PrecompiledAddressesCancun
+		return PrecompiledAddressesCancun
 	case rules.IsBerlin:
-		activePrecompileAddresses = PrecompiledAddressesBerlin
+		return PrecompiledAddressesBerlin
 	case rules.IsIstanbul:
-		activePrecompileAddresses = PrecompiledAddressesIstanbul
+		return PrecompiledAddressesIstanbul
 	case rules.IsByzantium:
-		activePrecompileAddresses = PrecompiledAddressesByzantium
+		return PrecompiledAddressesByzantium
 	default:
-		activePrecompileAddresses = PrecompiledAddressesHomestead
+		return PrecompiledAddressesHomestead
 	}
-
-	// [rollup-geth]
-	activePrecompileAddresses = append(activePrecompileAddresses, slices.Collect(maps.Keys(activeRollupPrecompiledContracts(rules)))...)
-
-	return activePrecompileAddresses
 }
 
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.
