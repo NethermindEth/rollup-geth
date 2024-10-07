@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"maps"
 	"math/big"
-	"slices"
 
 	"github.com/consensys/gnark-crypto/ecc"
 	bls12381 "github.com/consensys/gnark-crypto/ecc/bls12-381"
