@@ -40,24 +40,7 @@ type (
 )
 
 func (evm *EVM) precompile(addr common.Address) (PrecompiledContract, bool) {
-	var precompiles map[common.Address]PrecompiledContract
-	switch {
-	case evm.chainRules.IsStylus:
-		precompiles = PrecompiledContractsArbOS30
-	case evm.chainRules.IsArbitrum:
-		precompiles = PrecompiledContractsArbitrum
-	case evm.chainRules.IsCancun:
-		precompiles = PrecompiledContractsCancun
-	case evm.chainRules.IsBerlin:
-		precompiles = PrecompiledContractsBerlin
-	case evm.chainRules.IsIstanbul:
-		precompiles = PrecompiledContractsIstanbul
-	case evm.chainRules.IsByzantium:
-		precompiles = PrecompiledContractsByzantium
-	default:
-		precompiles = PrecompiledContractsHomestead
-	}
-	p, ok := precompiles[addr]
+	p, ok := evm.precompiles[addr]
 	return p, ok
 }
 
@@ -133,6 +116,8 @@ type EVM struct {
 	// available gas is calculated in gasCall* according to the 63/64 rule and later
 	// applied in opCall*.
 	callGasTemp uint64
+	// precompiles holds the precompiled contracts for the current epoch
+	precompiles PrecompiledContracts
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -158,7 +143,13 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 		chainConfig: chainConfig,
 		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil, blockCtx.Time, blockCtx.ArbOSVersion),
 	}
+
 	evm.ProcessingHook = DefaultTxProcessor{evm: evm}
+
+	evm.precompiles = activePrecompiledContracts(evm.chainRules)
+	//[rollup-geth]
+	evm.precompiles.ActivateRollupPrecompiledContracts(evm.chainRules, generateRollupPrecompiledContractsOverrides(evm))
+
 	evm.interpreter = NewEVMInterpreter(evm)
 	return evm
 }

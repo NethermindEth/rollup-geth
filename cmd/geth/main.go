@@ -247,6 +247,7 @@ func init() {
 		consoleFlags,
 		debug.Flags,
 		metricsFlags,
+		utils.RollupFlags, //[rollup-geth]
 	)
 	flags.AutoEnvVars(app.Flags, "GETH")
 

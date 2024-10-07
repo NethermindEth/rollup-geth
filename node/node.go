@@ -33,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/ethdb/pebble"
 	"github.com/ethereum/go-ethereum/event"
@@ -72,6 +73,8 @@ type Node struct {
 	databases map[*closeTrackingDB]struct{} // All open databases
 
 	apiFilter map[string]bool // Whitelisting API methods
+
+	ethClient *ethclient.Client
 }
 
 const (
@@ -753,6 +756,12 @@ func (n *Node) JWTPath() string {
 // the current protocol stack.
 func (n *Node) EventMux() *event.TypeMux {
 	return n.eventmux
+}
+
+// [rollup-geth]
+// EthClient returns instance of ETH RPC client
+func (n *Node) EthClient() *ethclient.Client {
+	return n.ethClient
 }
 
 // OpenDatabase opens an existing database with the given name (or creates one if no
