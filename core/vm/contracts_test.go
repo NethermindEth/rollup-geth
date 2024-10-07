@@ -46,7 +46,7 @@ type precompiledFailureTest struct {
 
 // allPrecompiles does not map to the actual set of precompiles, as it also contains
 // repriced versions of precompiles at certain slots
-var allPrecompiles = map[common.Address]PrecompiledContract{
+var allPrecompiles = PrecompiledContracts{
 	common.BytesToAddress([]byte{1}):    &ecrecover{},
 	common.BytesToAddress([]byte{2}):    &sha256hash{},
 	common.BytesToAddress([]byte{3}):    &ripemd160hash{},
@@ -184,7 +184,7 @@ func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
 		// Keep it as uint64, multiply 100 to get two digit float later
 		mgasps := (100 * 1000 * gasUsed) / elapsed
 		bench.ReportMetric(float64(mgasps)/100, "mgas/s")
-		//Check if it is correct
+		// Check if it is correct
 		if err != nil {
 			bench.Error(err)
 			return

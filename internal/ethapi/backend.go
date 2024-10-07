@@ -98,6 +98,9 @@ type Backend interface {
 	SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription
 	BloomStatus() (uint64, uint64)
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
+
+	//[rollup-geth]
+	GetL1RpcClient() vm.L1RpcClient
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {

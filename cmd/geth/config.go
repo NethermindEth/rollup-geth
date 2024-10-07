@@ -177,6 +177,9 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 	}
 	applyMetricConfig(ctx, &cfg)
 
+	//[rollup-geth]
+	activateL1RPCEndpoint(ctx, stack)
+
 	return stack, cfg
 }
 
@@ -281,6 +284,7 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 			utils.Fatalf("failed to register catalyst service: %v", err)
 		}
 	}
+
 	return stack
 }
 
