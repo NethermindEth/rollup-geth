@@ -23,7 +23,7 @@ type L1RpcClient interface {
 }
 
 var (
-	rollupL1SloadAddress         = common.BytesToAddress([]byte{0x10, 0x01})
+	rollupL1SloadAddress         = common.BytesToAddress([]byte{0x01, 0x01})
 	precompiledContractsRollupR0 = PrecompiledContracts{
 		rollupL1SloadAddress: &L1SLoad{},
 	}
