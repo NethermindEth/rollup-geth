@@ -113,7 +113,11 @@ type EVM struct {
 	// applied in opCall*.
 	callGasTemp uint64
 	// precompiles holds the precompiled contracts for the current epoch
-	precompiles map[common.Address]PrecompiledContract
+	precompiles PrecompiledContracts
+
+	//[rollup-geth]
+	// Overrides specific to precompiled contracts for rollups
+	rollupPrecompileOverrides RollupPrecompiledContractsOverrides
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -128,6 +132,11 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil, blockCtx.Time),
 	}
 	evm.precompiles = activePrecompiledContracts(evm.chainRules)
+
+	//[rollup-geth]
+	evm.rollupPrecompileOverrides = GenerateRollupPrecompiledContractsOverrides(evm)
+	evm.activateRollupPrecompiledContracts()
+
 	evm.interpreter = NewEVMInterpreter(evm)
 	return evm
 }

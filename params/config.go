@@ -894,6 +894,7 @@ type Rules struct {
 	IsBerlin, IsLondon                                      bool
 	IsMerge, IsShanghai, IsCancun, IsPrague                 bool
 	IsVerkle                                                bool
+	IsR0                                                    bool // [rollup-geth]
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -924,5 +925,6 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsPrague:         isMerge && c.IsPrague(num, timestamp),
 		IsVerkle:         isVerkle,
 		IsEIP4762:        isVerkle,
+		IsR0:             true, // [rollup-geth]
 	}
 }

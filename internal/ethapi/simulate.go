@@ -286,7 +286,14 @@ func (sim *simulator) activePrecompiles(base *types.Header) vm.PrecompiledContra
 		isMerge = (base.Difficulty.Sign() == 0)
 		rules   = sim.chainConfig.Rules(base.Number, isMerge, base.Time)
 	)
-	return maps.Clone(vm.ActivePrecompiledContracts(rules))
+	precompiles := vm.ActivePrecompiledContracts(rules)
+
+	//[rollup-geth] This is optional for rollups
+	precompiles.ActivateRollupPrecompiledContracts(vm.RollupPrecompileActivationConfig{
+		vm.L1SLoad{L1RpcClient: sim.b.GetL1RpcClient(), GetLatestL1BlockNumber: func() *big.Int { return base.Number }},
+	})
+
+	return maps.Clone(precompiles)
 }
 
 // sanitizeChain checks the chain integrity. Specifically it checks that

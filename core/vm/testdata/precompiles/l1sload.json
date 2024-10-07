@@ -1,0 +1,24 @@
+[
+  {
+    "Name": "L1SLOAD: 1 key",
+    "Input": "C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc22d2c7bb6fc06067df8b0223aec460d1ebb51febb9012bc2554141a4dca08e864",
+    "Expected": "abab",
+    "Gas": 4000,
+    "NoBenchmark": true
+  },
+  {
+    "Name": "L1SLOAD: 2 keys",
+    "Input": "C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc22d2c7bb6fc06067df8b0223aec460d1ebb51febb9012bc2554141a4dca08e8640112d016b65e9c617ad9ab60604f772a3620177bada4cdc773d9b6a982d3c2a7a",
+    "Expected": "abababab",
+    "Gas": 6000,
+    "NoBenchmark": true
+  },
+
+  {
+    "Name": "L1SLOAD: 5 keys",
+    "Input": "C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc22d2c7bb6fc06067df8b0223aec460d1ebb51febb9012bc2554141a4dca08e8640112d016b65e9c617ad9ab60604f772a3620177bada4cdc773d9b6a982d3c2a7a112d016b65e9c617ad9ab60604f772a3620177bada4cdc773d9b6a982d3c2a7a112d016b65e9c617ad9ab60604f772a3620177bada4cdc773d9b6a982d3c2a7a112d016b65e9c617ad9ab60604f772a3620177bada4cdc773d9b6a982d3c2a7a",
+    "Expected": "abababababababababab",
+    "Gas": 12000,
+    "NoBenchmark": true
+  }
+]
