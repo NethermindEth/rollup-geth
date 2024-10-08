@@ -693,3 +693,7 @@ func (b *APIBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
 func (b *APIBackend) FallbackClient() types.FallbackClient {
 	return b.fallbackClient
 }
+
+func (a *APIBackend) GetL1RpcClient() vm.L1RpcClient {
+	return a.BlockChain().GetVMConfig().L1RpcClient
+}
