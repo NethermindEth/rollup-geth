@@ -146,7 +146,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 
 	evm.ProcessingHook = DefaultTxProcessor{evm: evm}
 
-	evm.precompiles = activePrecompiledContracts(evm.chainRules)
+	evm.precompiles = ActivePrecompiledContracts(evm.chainRules)
 	//[rollup-geth]
 	evm.precompiles.ActivateRollupPrecompiledContracts(evm.chainRules, generateRollupPrecompiledContractsOverrides(evm))
 
