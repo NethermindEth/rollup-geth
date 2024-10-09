@@ -128,9 +128,8 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil, blockCtx.Time),
 	}
 
-	evm.precompiles = activePrecompiledContracts(evm.chainRules)
-
 	//[rollup-geth]
+	evm.precompiles = ActivePrecompiledContracts(evm.chainRules)
 	evm.precompiles.ActivateRollupPrecompiledContracts(evm.chainRules, generateRollupPrecompiledContractsOverrides(evm))
 
 	evm.interpreter = NewEVMInterpreter(evm)
