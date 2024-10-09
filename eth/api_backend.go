@@ -431,8 +431,3 @@ func (b *EthAPIBackend) StateAtBlock(ctx context.Context, block *types.Block, re
 func (b *EthAPIBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (*types.Transaction, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
 	return b.eth.stateAtTransaction(ctx, block, txIndex, reexec)
 }
-
-// [rollup-geth]
-func (b *EthAPIBackend) GetL1RpcClient() vm.L1RpcClient {
-	return b.eth.BlockChain().GetVMConfig().L1RpcClient
-}

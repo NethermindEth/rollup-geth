@@ -964,10 +964,14 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 
 		precompiles := vm.ActivePrecompiledContracts(rules)
 
-		//[rollup-geth] This is optional for rollups
-		precompiles.ActivateRollupPrecompiledContracts(vm.RollupPrecompileActivationConfig{
-			vm.L1SLoad{L1RpcClient: api.backend.GetL1RpcClient(), GetLatestL1BlockNumber: func() *big.Int { return vmctx.BlockNumber }},
-		})
+		//[rollup-geth]
+		rollupsConfig := vm.RollupPrecompileActivationConfig{
+			L1SLoad: vm.L1SLoad{
+				L1RpcClient:            api.backend.GetL1RpcClient(),
+				GetLatestL1BlockNumber: vm.LetRPCDecideLatestL1Number,
+			},
+		}
+		precompiles.ActivateRollupPrecompiledContracts(rules, &rollupsConfig)
 
 		if err := config.StateOverrides.Apply(statedb, precompiles); err != nil {
 			return nil, err

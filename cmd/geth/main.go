@@ -206,11 +206,6 @@ var (
 		utils.MetricsInfluxDBBucketFlag,
 		utils.MetricsInfluxDBOrganizationFlag,
 	}
-
-	//[rollup-geth]
-	rollupFlags = []cli.Flag{
-		utils.L1NodeRPCEndpointFlag,
-	}
 )
 
 var app = flags.NewApp("the go-ethereum command line interface")
@@ -262,7 +257,7 @@ func init() {
 		consoleFlags,
 		debug.Flags,
 		metricsFlags,
-		rollupFlags, //[rollup-geth]
+		utils.RollupFlags, //[rollup-geth]
 	)
 	flags.AutoEnvVars(app.Flags, "GETH")
 
