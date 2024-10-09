@@ -244,6 +244,9 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	}
 	overrides.ApplySuperchainUpgrades = config.ApplySuperchainUpgrades
 
+	// [rollup-geth]
+	vmConfig.L1RpcClient = stack.EthClient()
+
 	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, config.Genesis, &overrides, eth.engine, vmConfig, &config.TransactionHistory)
 	if err != nil {
 		return nil, err

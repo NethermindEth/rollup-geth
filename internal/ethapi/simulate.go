@@ -286,10 +286,21 @@ func (sim *simulator) sanitizeCall(call *TransactionArgs, state *state.StateDB, 
 
 func (sim *simulator) activePrecompiles(base *types.Header) vm.PrecompiledContracts {
 	var (
-		isMerge = (base.Difficulty.Sign() == 0)
+		isMerge = base.Difficulty.Sign() == 0
 		rules   = sim.chainConfig.Rules(base.Number, isMerge, base.Time)
 	)
-	return maps.Clone(vm.ActivePrecompiledContracts(rules))
+
+	//[rollup-geth]
+	rollupsConfig := vm.RollupPrecompileActivationConfig{
+		L1SLoad: vm.L1SLoad{
+			L1RpcClient:            sim.b.GetL1RpcClient(),
+			GetLatestL1BlockNumber: vm.LetRPCDecideLatestL1Number,
+		},
+	}
+	precompiles := vm.ActivePrecompiledContracts(rules)
+	precompiles.ActivateRollupPrecompiledContracts(rules, &rollupsConfig)
+
+	return maps.Clone(precompiles)
 }
 
 // sanitizeChain checks the chain integrity. Specifically it checks that
