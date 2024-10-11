@@ -1166,14 +1166,10 @@ func doCall(ctx context.Context, b Backend, args TransactionArgs, state *state.S
 	}
 	rules := b.ChainConfig().Rules(blockCtx.BlockNumber, blockCtx.Random != nil, blockCtx.Time)
 	precompiles := maps.Clone(vm.ActivePrecompiledContracts(rules))
+
 	//[rollup-geth]
-	rollupConfig := vm.RollupPrecompileActivationConfig{
-		L1SLoad: vm.L1SLoad{
-			L1RpcClient:            b.GetL1RpcClient(),
-			GetLatestL1BlockNumber: vm.LetRPCDecideLatestL1Number,
-		},
-	}
-	precompiles.ActivateRollupPrecompiledContracts(rules, &rollupConfig)
+	rollupConfigOverrides := vm.RollupPrecompileActivationConfig{}
+	precompiles.ActivateRollupPrecompiledContracts(rules, rollupConfigOverrides)
 
 	if err := overrides.Apply(state, precompiles); err != nil {
 		return nil, err

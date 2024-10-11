@@ -39,11 +39,7 @@ func activeRollupPrecompiledContracts(rules params.Rules) PrecompiledContracts {
 }
 
 // ActivateRollupPrecompiledContracts activates rollup-specific precompiles
-func (pc PrecompiledContracts) ActivateRollupPrecompiledContracts(rules params.Rules, config *RollupPrecompileActivationConfig) {
-	if config == nil {
-		return
-	}
-
+func (pc PrecompiledContracts) ActivateRollupPrecompiledContracts(rules params.Rules, config RollupPrecompileActivationConfig) {
 	activeRollupPrecompiles := activeRollupPrecompiledContracts(rules)
 	for k, v := range activeRollupPrecompiles {
 		pc[k] = v
@@ -131,11 +127,16 @@ func (c *L1SLoad) isL1SLoadActive() bool {
 }
 
 func (pc PrecompiledContracts) activateL1SLoad(l1RpcClient L1RpcClient, getLatestL1BlockNumber func() *big.Int) {
-	if paramsAreNil := l1RpcClient == nil || getLatestL1BlockNumber == nil; paramsAreNil {
-		return
-	}
 	if precompileNotRuleActivated := pc[rollupL1SloadAddress] == nil; precompileNotRuleActivated {
 		return
+	}
+
+	if rpcClientNotOverridenUseDefaultOne := l1RpcClient == nil; rpcClientNotOverridenUseDefaultOne {
+		l1RpcClient = defaultRollupPrecompilesConfig.L1RpcClient
+	}
+
+	if latestBlockGetterNotOverridenUseDefaultOne := getLatestL1BlockNumber == nil; latestBlockGetterNotOverridenUseDefaultOne {
+		getLatestL1BlockNumber = defaultRollupPrecompilesConfig.GetLatestL1BlockNumber
 	}
 
 	pc[rollupL1SloadAddress] = &L1SLoad{

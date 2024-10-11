@@ -7,9 +7,19 @@ import (
 	"math/big"
 )
 
+var defaultRollupPrecompilesConfig RollupPrecompileActivationConfig = RollupPrecompileActivationConfig{
+	L1SLoad: L1SLoad{
+		GetLatestL1BlockNumber: LetRPCDecideLatestL1Number,
+	},
+}
+
+func SetVmL1RpcClient(c L1RpcClient) {
+	defaultRollupPrecompilesConfig.L1RpcClient = c
+}
+
 // generateRollupPrecompiledContractsOverrides generates rollup precompile config including L2 specific overrides
-func generateRollupPrecompiledContractsOverrides(evm *EVM) *RollupPrecompileActivationConfig {
-	return &RollupPrecompileActivationConfig{
+func generateRollupPrecompiledContractsOverrides(evm *EVM) RollupPrecompileActivationConfig {
+	return RollupPrecompileActivationConfig{
 		L1SLoad{
 			L1RpcClient:            evm.Config.L1RpcClient,
 			GetLatestL1BlockNumber: LetRPCDecideLatestL1Number,

@@ -88,9 +88,6 @@ type Backend interface {
 	ChainDb() ethdb.Database
 	StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, StateReleaseFunc, error)
 	StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (*types.Transaction, vm.BlockContext, *state.StateDB, StateReleaseFunc, error)
-
-	// [rollup-geth]
-	GetL1RpcClient() vm.L1RpcClient
 }
 
 // API is the collection of tracing APIs exposed over the private debugging endpoint.
@@ -965,13 +962,7 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 		precompiles := vm.ActivePrecompiledContracts(rules)
 
 		//[rollup-geth]
-		rollupsConfig := vm.RollupPrecompileActivationConfig{
-			L1SLoad: vm.L1SLoad{
-				L1RpcClient:            api.backend.GetL1RpcClient(),
-				GetLatestL1BlockNumber: vm.LetRPCDecideLatestL1Number,
-			},
-		}
-		precompiles.ActivateRollupPrecompiledContracts(rules, &rollupsConfig)
+		precompiles.ActivateRollupPrecompiledContracts(rules, vm.RollupPrecompileActivationConfig{})
 
 		if err := config.StateOverrides.Apply(statedb, precompiles); err != nil {
 			return nil, err

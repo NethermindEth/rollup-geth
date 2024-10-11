@@ -217,7 +217,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	}
 
 	// [rollup-geth]
-	vmConfig.L1RpcClient = stack.EthClient()
+	vm.SetVmL1RpcClient(stack.EthClient())
 
 	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, config.Genesis, &overrides, eth.engine, vmConfig, &config.TransactionHistory)
 	if err != nil {
