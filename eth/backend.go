@@ -216,9 +216,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		overrides.OverrideVerkle = config.OverrideVerkle
 	}
 
-	// [rollup-geth]
-	vm.SetVmL1RpcClient(stack.EthClient())
-
 	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, config.Genesis, &overrides, eth.engine, vmConfig, &config.TransactionHistory)
 	if err != nil {
 		return nil, err
