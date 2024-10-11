@@ -163,6 +163,9 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 	}
 	applyMetricConfig(ctx, &cfg)
 
+	//[rollup-geth]
+	utils.ActivateL1RPCEndpoint(ctx, stack)
+
 	return stack, cfg
 }
 
