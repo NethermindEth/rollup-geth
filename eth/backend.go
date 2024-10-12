@@ -43,7 +43,6 @@ import (
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/eth/protocols/snap"
 	"github.com/ethereum/go-ethereum/eth/tracers"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
@@ -217,19 +216,11 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		overrides.OverrideVerkle = config.OverrideVerkle
 	}
 
-	//[rollup-geth]
-	l1Client, err := ethclient.Dial(config.L1NodeRPCEndpoint)
-	if err != nil {
-		log.Crit("Unable to connect to L1 RPC endpoint at", "URL", config.L1NodeRPCEndpoint, "error", err)
-	} else {
-		vmConfig.L1RpcClient = l1Client
-		log.Info("Initialized L1 RPC client", "endpoint", config.L1NodeRPCEndpoint)
-	}
-
 	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, config.Genesis, &overrides, eth.engine, vmConfig, &config.TransactionHistory)
 	if err != nil {
 		return nil, err
 	}
+
 	eth.bloomIndexer.Start(eth.blockchain)
 
 	if config.BlobPool.Datadir != "" {

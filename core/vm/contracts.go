@@ -174,31 +174,22 @@ func init() {
 }
 
 func activePrecompiledContracts(rules params.Rules) PrecompiledContracts {
-	var activePrecompiles PrecompiledContracts
 	switch {
 	case rules.IsVerkle:
-		activePrecompiles = PrecompiledContractsVerkle
+		return PrecompiledContractsVerkle
 	case rules.IsPrague:
-		activePrecompiles = PrecompiledContractsPrague
+		return PrecompiledContractsPrague
 	case rules.IsCancun:
-		activePrecompiles = PrecompiledContractsCancun
+		return PrecompiledContractsCancun
 	case rules.IsBerlin:
-		activePrecompiles = PrecompiledContractsBerlin
+		return PrecompiledContractsBerlin
 	case rules.IsIstanbul:
-		activePrecompiles = PrecompiledContractsIstanbul
+		return PrecompiledContractsIstanbul
 	case rules.IsByzantium:
-		activePrecompiles = PrecompiledContractsByzantium
+		return PrecompiledContractsByzantium
 	default:
-		activePrecompiles = PrecompiledContractsHomestead
+		return PrecompiledContractsHomestead
 	}
-
-	// [rollup-geth]
-	activeRollupPrecompiles := activeRollupPrecompiledContracts(rules)
-	for k, v := range activeRollupPrecompiles {
-		activePrecompiles[k] = v
-	}
-
-	return activePrecompiles
 }
 
 // ActivePrecompiledContracts returns a copy of precompiled contracts enabled with the current configuration.

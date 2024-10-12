@@ -283,15 +283,13 @@ func (sim *simulator) sanitizeCall(call *TransactionArgs, state *state.StateDB, 
 
 func (sim *simulator) activePrecompiles(base *types.Header) vm.PrecompiledContracts {
 	var (
-		isMerge = (base.Difficulty.Sign() == 0)
+		isMerge = base.Difficulty.Sign() == 0
 		rules   = sim.chainConfig.Rules(base.Number, isMerge, base.Time)
 	)
-	precompiles := vm.ActivePrecompiledContracts(rules)
 
-	//[rollup-geth] This is optional for rollups
-	precompiles.ActivateRollupPrecompiledContracts(vm.RollupPrecompileActivationConfig{
-		vm.L1SLoad{L1RpcClient: sim.b.GetL1RpcClient(), GetLatestL1BlockNumber: func() *big.Int { return base.Number }},
-	})
+	precompiles := vm.ActivePrecompiledContracts(rules)
+	//[rollup-geth]
+	precompiles.ActivateRollupPrecompiledContracts(rules, vm.RollupPrecompileActivationConfig{})
 
 	return maps.Clone(precompiles)
 }

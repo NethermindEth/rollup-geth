@@ -17,9 +17,7 @@
 package vm
 
 import (
-	"context"
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -38,11 +36,6 @@ type Config struct {
 
 	StatelessSelfValidation bool        // Generate execution witnesses and self-check against them (testing purpose)
 	L1RpcClient             L1RpcClient //[rollup-geth]
-}
-
-// [rollup-geth]
-type L1RpcClient interface {
-	StoragesAt(ctx context.Context, account common.Address, keys []common.Hash, blockNumber *big.Int) ([]byte, error)
 }
 
 // ScopeContext contains the things that are per-call, such as stack and memory,

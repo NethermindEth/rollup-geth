@@ -1167,10 +1167,9 @@ func doCall(ctx context.Context, b Backend, args TransactionArgs, state *state.S
 	rules := b.ChainConfig().Rules(blockCtx.BlockNumber, blockCtx.Random != nil, blockCtx.Time)
 	precompiles := maps.Clone(vm.ActivePrecompiledContracts(rules))
 
-	//[rollup-geth] This is optional for rollups
-	precompiles.ActivateRollupPrecompiledContracts(vm.RollupPrecompileActivationConfig{
-		vm.L1SLoad{L1RpcClient: b.GetL1RpcClient(), GetLatestL1BlockNumber: func() *big.Int { return blockCtx.BlockNumber }},
-	})
+	//[rollup-geth]
+	rollupConfigOverrides := vm.RollupPrecompileActivationConfig{}
+	precompiles.ActivateRollupPrecompiledContracts(rules, rollupConfigOverrides)
 
 	if err := overrides.Apply(state, precompiles); err != nil {
 		return nil, err
@@ -1645,7 +1644,7 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 	}
 	isPostMerge := header.Difficulty.Sign() == 0
 	// Retrieve the precompiles since they don't need to be added to the access list
-	precompiles := vm.ActivePrecompiles(b.ChainConfig().Rules(header.Number, isPostMerge, header.Time))
+	precompiles := vm.ActivePrecompilesIncludingRollups(b.ChainConfig().Rules(header.Number, isPostMerge, header.Time))
 
 	// Create an initial tracer
 	prevTracer := logger.NewAccessListTracer(nil, args.from(), to, precompiles)
