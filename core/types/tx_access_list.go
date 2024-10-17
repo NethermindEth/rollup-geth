@@ -21,6 +21,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -126,4 +127,24 @@ func (tx *AccessListTx) encode(b *bytes.Buffer) error {
 
 func (tx *AccessListTx) decode(input []byte) error {
 	return rlp.DecodeBytes(input, tx)
+}
+
+func (tx *AccessListTx) calldataGas() uint64 {
+	zeroBytes := bytes.Count(tx.Data, []byte{0x00})
+	nonZeroBytes := len(tx.Data) - zeroBytes
+	tokens := uint64(zeroBytes) + uint64(nonZeroBytes)*params.CalldataTokensPerNonZeroByte
+
+	return tokens * params.CalldataGasPerToken
+}
+
+func (tx *AccessListTx) gasLimits() VectorGasLimit {
+	return VectorGasLimit{tx.Gas, 0, tx.calldataGas()}
+}
+
+func (tx *AccessListTx) gasTipCaps() VectorFeeBigint {
+	return VectorFeeBigint{tx.GasPrice, common.Big0, tx.GasPrice}
+}
+
+func (tx *AccessListTx) gasFeeCaps() VectorFeeBigint {
+	return VectorFeeBigint{tx.GasPrice, common.Big0, tx.GasPrice}
 }

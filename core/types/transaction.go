@@ -49,6 +49,7 @@ const (
 	AccessListTxType = 0x01
 	DynamicFeeTxType = 0x02
 	BlobTxType       = 0x03
+	VectorFeeTxType  = 0x04
 )
 
 // Transaction is an Ethereum transaction.
@@ -100,6 +101,10 @@ type TxData interface {
 
 	encode(*bytes.Buffer) error
 	decode([]byte) error
+
+	gasTipCaps() VectorFeeBigint
+	gasFeeCaps() VectorFeeBigint
+	gasLimits() VectorGasLimit
 }
 
 // EncodeRLP implements rlp.Encoder
@@ -206,6 +211,8 @@ func (tx *Transaction) decodeTyped(b []byte) (TxData, error) {
 		inner = new(DynamicFeeTx)
 	case BlobTxType:
 		inner = new(BlobTx)
+	case VectorFeeTxType:
+		inner = new(VectorFeeTx)
 	default:
 		return nil, ErrTxTypeNotSupported
 	}
@@ -288,11 +295,20 @@ func (tx *Transaction) AccessList() AccessList { return tx.inner.accessList() }
 // Gas returns the gas limit of the transaction.
 func (tx *Transaction) Gas() uint64 { return tx.inner.gas() }
 
+// Gas returns the gas limit of the transaction for each of [execution, blob, calldata] gas "type" respectively .
+func (tx *Transaction) GasLimits() VectorGasLimit { return tx.inner.gasLimits() }
+
 // GasPrice returns the gas price of the transaction.
 func (tx *Transaction) GasPrice() *big.Int { return new(big.Int).Set(tx.inner.gasPrice()) }
 
 // GasTipCap returns the gasTipCap per gas of the transaction.
 func (tx *Transaction) GasTipCap() *big.Int { return new(big.Int).Set(tx.inner.gasTipCap()) }
+
+// GasTipCaps returns the vector of tip caps per gas for each of [executon, blob, calldata] gas "types" respectively
+func (tx *Transaction) GasTipCaps() VectorFeeBigint { return tx.inner.gasTipCaps() }
+
+// GasFeeCaps returns the vector of fee caps per gas  for each of [executon, blob, calldata] gas "types" respectively
+func (tx *Transaction) GasFeeCaps() VectorFeeBigint { return tx.inner.gasFeeCaps() }
 
 // GasFeeCap returns the fee cap per gas of the transaction.
 func (tx *Transaction) GasFeeCap() *big.Int { return new(big.Int).Set(tx.inner.gasFeeCap()) }
