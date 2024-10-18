@@ -123,3 +123,23 @@ func (tx *DynamicFeeTx) encode(b *bytes.Buffer) error {
 func (tx *DynamicFeeTx) decode(input []byte) error {
 	return rlp.DecodeBytes(input, tx)
 }
+
+func (tx *DynamicFeeTx) calldataGas() uint64 {
+	zeroBytes := bytes.Count(tx.Data, []byte{0x00})
+	nonZeroBytes := len(tx.Data) - zeroBytes
+	tokens := uint64(zeroBytes) + uint64(nonZeroBytes)*params.CalldataTokensPerNonZeroByte
+
+	return tokens * params.CalldataGasPerToken
+}
+
+func (tx *DynamicFeeTx) gasLimits() VectorGasLimit {
+	return VectorGasLimit{tx.Gas, 0, tx.calldataGas()}
+}
+
+func (tx *DynamicFeeTx) gasTipCaps() VectorFeeBigint {
+	return VectorFeeBigint{tx.GasTipCap, big.NewInt(0), tx.GasTipCap}
+}
+
+func (tx *DynamicFeeTx) gasFeeCaps() VectorFeeBigint {
+	return VectorFeeBigint{tx.GasFeeCap, big.NewInt(0), tx.GasFeeCap}
+}
