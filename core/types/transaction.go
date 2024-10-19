@@ -400,6 +400,44 @@ func (tx *Transaction) EffectiveGasTipIntCmp(other *big.Int, baseFee *big.Int) i
 	return tx.EffectiveGasTipValue(baseFee).Cmp(other)
 }
 
+// EffectiveGasPrice returns the effective (actual) price per gas
+func (tx *Transaction) EffectiveGasPrice(baseFee *big.Int) *big.Int {
+	return tx.inner.effectiveGasPrice(new(big.Int), baseFee)
+}
+
+// EffectiveGasTip returnss the effective miner gasTipCap for the given base fees, per gas for each of [execution, blob, calldata] gas "type" respectively .
+func (tx *Transaction) EffectiveGasTips(baseFees VectorFeeBigint) VectorFeeBigint {
+	gasFeeCaps := tx.GasFeeCaps()
+	gasTipCaps := tx.GasTipCaps()
+	effectiveTips := NewVectorFeeBigInt()
+	for i, baseFee := range baseFees {
+		if baseFee == nil {
+			effectiveTips[i].Set(gasTipCaps[i])
+		} else {
+			effectiveTips[i] = math.BigMin(gasTipCaps[i], effectiveTips[i].Sub(gasFeeCaps[i], baseFee))
+		}
+	}
+
+	return effectiveTips
+}
+
+// EffectiveGasPrices returns the effective (actual) prices per gas for each of [execution, blob, calldata] gas "type" respectively .
+func (tx *Transaction) EffectiveGasPrices(baseFees VectorFeeBigint) VectorFeeBigint {
+	gasFeeCaps := tx.GasFeeCaps()
+	gasTipCaps := tx.GasTipCaps()
+	effectiveFees := NewVectorFeeBigInt()
+
+	for i, baseFee := range baseFees {
+		if baseFee == nil {
+			effectiveFees[i].Set(gasFeeCaps[i])
+		} else {
+			effectiveFees[i] = math.BigMin(effectiveFees[i].Add(gasTipCaps[i], baseFee), gasFeeCaps[i])
+		}
+	}
+
+	return effectiveFees
+}
+
 // BlobGas returns the blob gas limit of the transaction for blob transactions, 0 otherwise.
 func (tx *Transaction) BlobGas() uint64 {
 	if blobtx, ok := tx.inner.(*BlobTx); ok {

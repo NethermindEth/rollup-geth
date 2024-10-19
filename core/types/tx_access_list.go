@@ -142,9 +142,9 @@ func (tx *AccessListTx) gasLimits() VectorGasLimit {
 }
 
 func (tx *AccessListTx) gasTipCaps() VectorFeeBigint {
-	return VectorFeeBigint{tx.GasPrice, common.Big0, tx.GasPrice}
+	return VectorFeeBigint{tx.GasPrice, big.NewInt(0), tx.GasPrice}
 }
 
 func (tx *AccessListTx) gasFeeCaps() VectorFeeBigint {
-	return VectorFeeBigint{tx.GasPrice, common.Big0, tx.GasPrice}
+	return VectorFeeBigint{tx.GasPrice, big.NewInt(0), tx.GasPrice}
 }

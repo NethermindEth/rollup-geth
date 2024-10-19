@@ -12,6 +12,15 @@ type (
 	VectorGasLimit  [3]uint64
 )
 
+func NewVectorFeeBigInt() VectorFeeBigint {
+	var result VectorFeeBigint
+	for i := range result {
+		result[i] = new(big.Int)
+	}
+
+	return result
+}
+
 // TODO: Add nil checks
 func (vec VectorFeeBigint) Sum() *big.Int {
 	sum := big.NewInt(0)

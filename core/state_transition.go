@@ -22,7 +22,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -149,14 +148,24 @@ type Message struct {
 
 	// When SkipFromEOACheck is true, the message sender is not checked to be an EOA.
 	SkipFromEOACheck bool
+
+	EffectiveGasTip    *big.Int
+	EffectiveGasPrices types.VectorFeeBigint
+	EffectiveGasTips   types.VectorFeeBigint
+
+	GasLimits  types.VectorGasLimit
+	GasFeeCaps types.VectorFeeBigint
+	GasTipCaps types.VectorFeeBigint
 }
+
+// TODO: go through all the references of this function call and see where we have to update to our newly added  TransactionToMessageEIP7706
 
 // TransactionToMessage converts a transaction into a Message.
 func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.Int) (*Message, error) {
 	msg := &Message{
 		Nonce:            tx.Nonce(),
 		GasLimit:         tx.Gas(),
-		GasPrice:         new(big.Int).Set(tx.GasPrice()),
+		GasPrice:         tx.EffectiveGasPrice(baseFee),
 		GasFeeCap:        new(big.Int).Set(tx.GasFeeCap()),
 		GasTipCap:        new(big.Int).Set(tx.GasTipCap()),
 		To:               tx.To(),
@@ -167,11 +176,13 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		SkipFromEOACheck: false,
 		BlobHashes:       tx.BlobHashes(),
 		BlobGasFeeCap:    tx.BlobGasFeeCap(),
+		GasFeeCaps:       tx.GasFeeCaps(),
+		GasTipCaps:       tx.GasTipCaps(),
+		GasLimits:        tx.GasLimits(),
+
+		EffectiveGasTip: tx.EffectiveGasTipValue(baseFee),
 	}
-	// If baseFee provided, set gasPrice to effectiveGasPrice.
-	if baseFee != nil {
-		msg.GasPrice = cmath.BigMin(msg.GasPrice.Add(msg.GasTipCap, baseFee), msg.GasFeeCap)
-	}
+
 	var err error
 	msg.From, err = types.Sender(s, tx)
 	return msg, err
@@ -237,7 +248,7 @@ func (st *StateTransition) to() common.Address {
 	return *st.msg.To
 }
 
-func (st *StateTransition) buyGas() error {
+func (st *StateTransition) buyGasEIP4844() error {
 	mgval := new(big.Int).SetUint64(st.msg.GasLimit)
 	mgval.Mul(mgval, st.msg.GasPrice)
 	balanceCheck := new(big.Int).Set(mgval)
@@ -306,31 +317,11 @@ func (st *StateTransition) preCheck() error {
 				msg.From.Hex(), codeHash)
 		}
 	}
-	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
-	if st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
-		// Skip the checks if gas fields are zero and baseFee was explicitly disabled (eth_call)
-		skipCheck := st.evm.Config.NoBaseFee && msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0
-		if !skipCheck {
-			if l := msg.GasFeeCap.BitLen(); l > 256 {
-				return fmt.Errorf("%w: address %v, maxFeePerGas bit length: %d", ErrFeeCapVeryHigh,
-					msg.From.Hex(), l)
-			}
-			if l := msg.GasTipCap.BitLen(); l > 256 {
-				return fmt.Errorf("%w: address %v, maxPriorityFeePerGas bit length: %d", ErrTipVeryHigh,
-					msg.From.Hex(), l)
-			}
-			if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
-				return fmt.Errorf("%w: address %v, maxPriorityFeePerGas: %s, maxFeePerGas: %s", ErrTipAboveFeeCap,
-					msg.From.Hex(), msg.GasTipCap, msg.GasFeeCap)
-			}
-			// This will panic if baseFee is nil, but basefee presence is verified
-			// as part of header validation.
-			if msg.GasFeeCap.Cmp(st.evm.Context.BaseFee) < 0 {
-				return fmt.Errorf("%w: address %v, maxFeePerGas: %s, baseFee: %s", ErrFeeCapTooLow,
-					msg.From.Hex(), msg.GasFeeCap, st.evm.Context.BaseFee)
-			}
-		}
+
+	if preCheckGasErr := st.preCheckGas(); preCheckGasErr != nil {
+		return preCheckGasErr
 	}
+
 	// Check the blob version validity
 	if msg.BlobHashes != nil {
 		// The to field of a blob tx type is mandatory, and a `BlobTx` transaction internally
@@ -345,21 +336,6 @@ func (st *StateTransition) preCheck() error {
 		for i, hash := range msg.BlobHashes {
 			if !kzg4844.IsValidVersionedHash(hash[:]) {
 				return fmt.Errorf("blob %d has invalid hash version", i)
-			}
-		}
-	}
-	// Check that the user is paying at least the current blob fee
-	if st.evm.ChainConfig().IsCancun(st.evm.Context.BlockNumber, st.evm.Context.Time) {
-		if st.blobGasUsed() > 0 {
-			// Skip the checks if gas fields are zero and blobBaseFee was explicitly disabled (eth_call)
-			skipCheck := st.evm.Config.NoBaseFee && msg.BlobGasFeeCap.BitLen() == 0
-			if !skipCheck {
-				// This will panic if blobBaseFee is nil, but blobBaseFee presence
-				// is verified as part of header validation.
-				if msg.BlobGasFeeCap.Cmp(st.evm.Context.BlobBaseFee) < 0 {
-					return fmt.Errorf("%w: address %v blobGasFeeCap: %v, blobBaseFee: %v", ErrBlobFeeCapTooLow,
-						msg.From.Hex(), msg.BlobGasFeeCap, st.evm.Context.BlobBaseFee)
-				}
 			}
 		}
 	}
@@ -459,28 +435,11 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		// After EIP-3529: refunds are capped to gasUsed / 5
 		gasRefund = st.refundGas(params.RefundQuotientEIP3529)
 	}
-	effectiveTip := msg.GasPrice
-	if rules.IsLondon {
-		effectiveTip = cmath.BigMin(msg.GasTipCap, new(big.Int).Sub(msg.GasFeeCap, st.evm.Context.BaseFee))
-	}
-	effectiveTipU256, _ := uint256.FromBig(effectiveTip)
 
-	if st.evm.Config.NoBaseFee && msg.GasFeeCap.Sign() == 0 && msg.GasTipCap.Sign() == 0 {
-		// Skip fee payment when NoBaseFee is set and the fee fields
-		// are 0. This avoids a negative effectiveTip being applied to
-		// the coinbase when simulating calls.
-	} else {
-		fee := new(uint256.Int).SetUint64(st.gasUsed())
-		fee.Mul(fee, effectiveTipU256)
-		st.state.AddBalance(st.evm.Context.Coinbase, fee, tracing.BalanceIncreaseRewardTransactionFee)
-
-		// add the coinbase to the witness iff the fee is greater than 0
-		if rules.IsEIP4762 && fee.Sign() != 0 {
-			st.evm.AccessEvents.AddAccount(st.evm.Context.Coinbase, true)
-		}
-	}
+	st.payTheTip(rules, msg)
 
 	return &ExecutionResult{
+		// TODO: this should be vector [execution_gas, blobl_gas, calldata_gas]
 		UsedGas:     st.gasUsed(),
 		RefundedGas: gasRefund,
 		Err:         vmerr,
@@ -502,9 +461,7 @@ func (st *StateTransition) refundGas(refundQuotient uint64) uint64 {
 	st.gasRemaining += refund
 
 	// Return ETH for remaining gas, exchanged at the original rate.
-	remaining := uint256.NewInt(st.gasRemaining)
-	remaining.Mul(remaining, uint256.MustFromBig(st.msg.GasPrice))
-	st.state.AddBalance(st.msg.From, remaining, tracing.BalanceIncreaseGasReturn)
+	st.refundGasToAddress()
 
 	if st.evm.Config.Tracer != nil && st.evm.Config.Tracer.OnGasChange != nil && st.gasRemaining > 0 {
 		st.evm.Config.Tracer.OnGasChange(st.gasRemaining, 0, tracing.GasChangeTxLeftOverReturned)
