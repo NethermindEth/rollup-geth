@@ -29,7 +29,8 @@ import (
 
 // Config are the configuration options for the Interpreter
 type Config struct {
-	Tracer                  *tracing.Hooks
+	Tracer *tracing.Hooks
+	// TODO: double-check if this needs to be vectorized as well? I guesss not since per comment flag is for 0 price calls
 	NoBaseFee               bool  // Forces the EIP-1559 baseFee to 0 (needed for 0 price calls)
 	EnablePreimageRecording bool  // Enables recording of SHA3/keccak preimages
 	ExtraEips               []int // Additional EIPS that are to be enabled

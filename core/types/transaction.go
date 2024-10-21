@@ -49,6 +49,8 @@ const (
 	AccessListTxType = 0x01
 	DynamicFeeTxType = 0x02
 	BlobTxType       = 0x03
+	//[rollup-geth]
+	VectorFeeTxType = 0x04
 )
 
 // Transaction is an Ethereum transaction.
@@ -100,6 +102,11 @@ type TxData interface {
 
 	encode(*bytes.Buffer) error
 	decode([]byte) error
+
+	//[rollup-geth]
+	gasTipCaps() VectorFeeBigint
+	gasFeeCaps() VectorFeeBigint
+	gasLimits() VectorGasLimit
 }
 
 // EncodeRLP implements rlp.Encoder
@@ -206,6 +213,9 @@ func (tx *Transaction) decodeTyped(b []byte) (TxData, error) {
 		inner = new(DynamicFeeTx)
 	case BlobTxType:
 		inner = new(BlobTx)
+	// [rollup-geth]
+	case VectorFeeTxType:
+		inner = new(VectorFeeTx)
 	default:
 		return nil, ErrTxTypeNotSupported
 	}
