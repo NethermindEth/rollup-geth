@@ -34,7 +34,8 @@ type Config struct {
 	EnablePreimageRecording bool  // Enables recording of SHA3/keccak preimages
 	ExtraEips               []int // Additional EIPS that are to be enabled
 
-	StatelessSelfValidation bool // Generate execution witnesses and self-check against them (testing purpose)
+	StatelessSelfValidation bool        // Generate execution witnesses and self-check against them (testing purpose)
+	L1RpcClient             L1RpcClient //[rollup-geth]
 }
 
 // ScopeContext contains the things that are per-call, such as stack and memory,
