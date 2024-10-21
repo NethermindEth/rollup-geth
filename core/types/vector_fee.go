@@ -109,3 +109,12 @@ func (vec VectorGasLimit) ToVectorBigInt() VectorFeeBigint {
 
 	return result
 }
+
+func (vec VectorGasLimit) VectorSubtract(other VectorGasLimit) VectorGasLimit {
+	var result VectorGasLimit
+	for i, v := range vec {
+		result[i] = v - other[i]
+	}
+
+	return result
+}

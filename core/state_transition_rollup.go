@@ -14,22 +14,24 @@ import (
 // TransactionToMessage converts a transaction into a Message post EIP-7706
 func TransactionToMessageEIP7706(tx *types.Transaction, s types.Signer, baseFees types.VectorFeeBigint) (*Message, error) {
 	msg := &Message{
-		Nonce:              tx.Nonce(),
-		GasLimit:           tx.Gas(),
-		EffectiveGasPrices: tx.EffectiveGasPrices(baseFees),
-		GasFeeCap:          new(big.Int).Set(tx.GasFeeCap()),
-		GasTipCap:          new(big.Int).Set(tx.GasTipCap()),
-		EffectiveGasTips:   tx.EffectiveGasTips(baseFees),
-		To:                 tx.To(),
-		Value:              tx.Value(),
-		Data:               tx.Data(),
-		AccessList:         tx.AccessList(),
-		SkipNonceChecks:    false,
-		SkipFromEOACheck:   false,
-		BlobHashes:         tx.BlobHashes(),
-		BlobGasFeeCap:      tx.BlobGasFeeCap(),
+		Nonce:            tx.Nonce(),
+		GasLimit:         tx.Gas(),
+		GasFeeCap:        new(big.Int).Set(tx.GasFeeCap()),
+		GasTipCap:        new(big.Int).Set(tx.GasTipCap()),
+		To:               tx.To(),
+		Value:            tx.Value(),
+		Data:             tx.Data(),
+		AccessList:       tx.AccessList(),
+		SkipNonceChecks:  false,
+		SkipFromEOACheck: false,
+		BlobHashes:       tx.BlobHashes(),
+		BlobGasFeeCap:    tx.BlobGasFeeCap(),
+
 		GasFeeCaps:         tx.GasFeeCaps(),
 		GasTipCaps:         tx.GasTipCaps(),
+		GasLimits:          tx.GasLimits(),
+		EffectiveGasTips:   tx.EffectiveGasTips(baseFees),
+		EffectiveGasPrices: tx.EffectiveGasPrices(baseFees),
 	}
 
 	var err error
@@ -43,6 +45,50 @@ func (st *StateTransition) buyGas() error {
 	}
 
 	return st.buyGasEIP4844()
+}
+
+func (st *StateTransition) buyGasEIP4844() error {
+	mgval := new(big.Int).SetUint64(st.msg.GasLimit)
+	mgval.Mul(mgval, st.msg.GasPrice)
+	balanceCheck := new(big.Int).Set(mgval)
+	if st.msg.GasFeeCap != nil {
+		balanceCheck.SetUint64(st.msg.GasLimit)
+		balanceCheck = balanceCheck.Mul(balanceCheck, st.msg.GasFeeCap)
+	}
+	balanceCheck.Add(balanceCheck, st.msg.Value)
+
+	if st.evm.ChainConfig().IsCancun(st.evm.Context.BlockNumber, st.evm.Context.Time) {
+		if blobGas := st.blobGasUsed(); blobGas > 0 {
+			// Check that the user has enough funds to cover blobGasUsed * tx.BlobGasFeeCap
+			blobBalanceCheck := new(big.Int).SetUint64(blobGas)
+			blobBalanceCheck.Mul(blobBalanceCheck, st.msg.BlobGasFeeCap)
+			balanceCheck.Add(balanceCheck, blobBalanceCheck)
+			// Pay for blobGasUsed * actual blob fee
+			blobFee := new(big.Int).SetUint64(blobGas)
+			blobFee.Mul(blobFee, st.evm.Context.BlobBaseFee)
+			mgval.Add(mgval, blobFee)
+		}
+	}
+	balanceCheckU256, overflow := uint256.FromBig(balanceCheck)
+	if overflow {
+		return fmt.Errorf("%w: address %v required balance exceeds 256 bits", ErrInsufficientFunds, st.msg.From.Hex())
+	}
+	if have, want := st.state.GetBalance(st.msg.From), balanceCheckU256; have.Cmp(want) < 0 {
+		return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From.Hex(), have, want)
+	}
+	if err := st.gp.SubGas(st.msg.GasLimit); err != nil {
+		return err
+	}
+
+	if st.evm.Config.Tracer != nil && st.evm.Config.Tracer.OnGasChange != nil {
+		st.evm.Config.Tracer.OnGasChange(0, st.msg.GasLimit, tracing.GasChangeTxInitialBalance)
+	}
+	st.gasRemaining = st.msg.GasLimit
+
+	st.initialGas = st.msg.GasLimit
+	mgvalU256, _ := uint256.FromBig(mgval)
+	st.state.SubBalance(st.msg.From, mgvalU256, tracing.BalanceDecreaseGasBuy)
+	return nil
 }
 
 func (st *StateTransition) buyGasEIP7706() error {
@@ -61,12 +107,9 @@ func (st *StateTransition) buyGasEIP7706() error {
 		return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From.Hex(), have, want)
 	}
 
-	// NOTE: calculations below, which rely on msg.GasLimit are still valid
+	// NOTE: calculations below, which rely on msg.GasLimit, are still valid
 	// This is because per EIP-7706 will still have Gas(Limit) as TX field
-	// Which is in fact gas execution limit, EIP-7706 tx_vector_fee returns this gas
-	// same as previous tx types
-	// Blob Gas Limit and Calldata Gas Limit are calculated per protocol spec (EIP-7706/EIP-4844)
-	// and thus not part of transaction
+	// Which is in fact gas execution limit, so msg.GasLimits[0] == msg.GasLimit
 	if err := st.gp.SubGas(st.msg.GasLimit); err != nil {
 		return err
 	}
@@ -184,10 +227,10 @@ func (st *StateTransition) refundGasToAddressEIP4844() {
 }
 
 func (st *StateTransition) refundGasToAddressEIP7706() {
-	executionEffectiveGasPrice := st.msg.EffectiveGasPrices[0]
-	gasFeeToRefund := uint256.NewInt(st.gasRemaining)
-	gasFeeToRefund.Mul(gasFeeToRefund, uint256.MustFromBig(executionEffectiveGasPrice))
-	st.state.AddBalance(st.msg.From, gasFeeToRefund, tracing.BalanceIncreaseGasReturn)
+	gasToRefund := st.vectorGasRemaining().ToVectorBigInt()
+	gasFeeToRefund := gasToRefund.VectorMul(st.msg.EffectiveGasPrices).Sum()
+
+	st.state.AddBalance(st.msg.From, uint256.MustFromBig(gasFeeToRefund), tracing.BalanceIncreaseGasReturn)
 }
 
 func (st *StateTransition) payTheTip(rules params.Rules, msg *Message) {
@@ -226,12 +269,7 @@ func (st *StateTransition) payTheTipEIP7706(rules params.Rules, msg *Message) {
 		return
 	}
 
-	// NOTE: Gas used by [execution, blob, calldata]
-	// Blob and calldata gas used is actually gas limit (because it is precomputed from tx data and known upfront)
-	// Only execution gas is not known upfront and has to be determined while executing the transaction
-	gasUsed := msg.GasLimits
-	gasUsed[0] = st.gasUsed()
-
+	gasUsed := st.vectorGasUsed()
 	totalTip, _ := uint256.FromBig(msg.EffectiveGasTips.VectorMul(gasUsed.ToVectorBigInt()).Sum())
 	st.state.AddBalance(st.evm.Context.Coinbase, totalTip, tracing.BalanceIncreaseRewardTransactionFee)
 
@@ -239,4 +277,25 @@ func (st *StateTransition) payTheTipEIP7706(rules params.Rules, msg *Message) {
 	if rules.IsEIP4762 && totalTip.Sign() != 0 {
 		st.evm.AccessEvents.AddAccount(st.evm.Context.Coinbase, true)
 	}
+}
+
+func (st *StateTransition) vectorGasUsed() types.VectorGasLimit {
+	// TODO: think if this should be "precalculated", that is set where we update st.gasRemaining
+	// NOTE: Gas used by [execution, blob, calldata]
+	// Blob and calldata gas used is actually same as their gas limits (because it is precomputed from tx data and known upfront)
+	// Only execution gas is not known upfront and has to be determined while executing the transaction
+	gasUsed := st.msg.GasLimits
+	gasUsed[0] = st.gasUsed()
+
+	return gasUsed
+}
+
+func (st *StateTransition) vectorGasRemaining() types.VectorGasLimit {
+	//NOTE: Per EIP-7706:
+	//In practice, only the first term will be nonzero for now
+	//This is because gas used by blob and calldata can be calculated upfront so we don't have any remaining calldata/blob gas
+
+	//NOTE: 2 msg.GasLimits[0] == msg.GasLimit == st.initialGas
+	// this is why this holds
+	return st.msg.GasLimits.VectorSubtract(st.vectorGasUsed())
 }

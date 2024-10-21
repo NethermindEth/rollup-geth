@@ -1,6 +1,10 @@
 package types
 
-import "github.com/ethereum/go-ethereum/common/math"
+import (
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common/math"
+)
 
 // Gas returns the gas limit of the transaction for each of [execution, blob, calldata] gas "type" respectively .
 func (tx *Transaction) GasLimits() VectorGasLimit { return tx.inner.gasLimits() }
@@ -42,4 +46,9 @@ func (tx *Transaction) EffectiveGasPrices(baseFees VectorFeeBigint) VectorFeeBig
 	}
 
 	return effectiveFees
+}
+
+// EffectiveGasPrice returns the effective (actual) price per gas
+func (tx *Transaction) EffectiveGasPrice(baseFee *big.Int) *big.Int {
+	return tx.inner.effectiveGasPrice(new(big.Int), baseFee)
 }
