@@ -39,12 +39,36 @@ func TransactionToMessageEIP7706(tx *types.Transaction, s types.Signer, baseFees
 	return msg, err
 }
 
+func (st *StateTransition) preCheckGas() error {
+	if st.evm.ChainConfig().IsR0() {
+		return st.preCheckGasEIP7706()
+	}
+
+	return st.preCheckGasEIP4484()
+}
+
 func (st *StateTransition) buyGas() error {
 	if !st.evm.ChainConfig().IsR0() {
 		return st.buyGasEIP7706()
 	}
 
 	return st.buyGasEIP4844()
+}
+
+func (st *StateTransition) refundGasToAddress() {
+	if st.evm.ChainConfig().IsR0() {
+		st.refundGasToAddressEIP7706()
+	} else {
+		st.refundGasToAddressEIP4844()
+	}
+}
+
+func (st *StateTransition) payTheTip(rules params.Rules, msg *Message) {
+	if st.evm.ChainConfig().IsR0() {
+		st.payTheTipEIP7706(rules, msg)
+	} else {
+		st.payTheTipEIP4844(rules, msg)
+	}
 }
 
 func (st *StateTransition) buyGasEIP4844() error {
@@ -129,15 +153,7 @@ func (st *StateTransition) buyGasEIP7706() error {
 	return nil
 }
 
-func (st *StateTransition) preCheckGas() error {
-	if st.evm.ChainConfig().IsR0() {
-		return st.preCheckGasEIP7706()
-	}
-
-	return st.preCheckGasEip4484()
-}
-
-func (st *StateTransition) preCheckGasEip4484() error {
+func (st *StateTransition) preCheckGasEIP4484() error {
 	msg := st.msg
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
 	if st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
@@ -212,14 +228,6 @@ func (st *StateTransition) preCheckGasEIP7706() error {
 	return nil
 }
 
-func (st *StateTransition) refundGasToAddress() {
-	if st.evm.ChainConfig().IsR0() {
-		st.refundGasToAddressEIP7706()
-	} else {
-		st.refundGasToAddressEIP4844()
-	}
-}
-
 func (st *StateTransition) refundGasToAddressEIP4844() {
 	gasFeeToRefund := uint256.NewInt(st.gasRemaining)
 	gasFeeToRefund.Mul(gasFeeToRefund, uint256.MustFromBig(st.msg.GasPrice))
@@ -231,14 +239,6 @@ func (st *StateTransition) refundGasToAddressEIP7706() {
 	gasFeeToRefund := gasToRefund.VectorMul(st.msg.EffectiveGasPrices).Sum()
 
 	st.state.AddBalance(st.msg.From, uint256.MustFromBig(gasFeeToRefund), tracing.BalanceIncreaseGasReturn)
-}
-
-func (st *StateTransition) payTheTip(rules params.Rules, msg *Message) {
-	if st.evm.ChainConfig().IsR0() {
-		st.payTheTipEIP7706(rules, msg)
-	} else {
-		st.payTheTipEIP4844(rules, msg)
-	}
 }
 
 func (st *StateTransition) payTheTipEIP4844(rules params.Rules, msg *Message) {

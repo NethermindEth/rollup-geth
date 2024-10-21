@@ -166,7 +166,6 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 	msg := &Message{
 		Nonce:            tx.Nonce(),
 		GasLimit:         tx.Gas(),
-		GasPrice:         tx.EffectiveGasPrice(baseFee), //[rollup-geth]
 		GasFeeCap:        new(big.Int).Set(tx.GasFeeCap()),
 		GasTipCap:        new(big.Int).Set(tx.GasTipCap()),
 		To:               tx.To(),
@@ -183,6 +182,7 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		GasTipCaps:      tx.GasTipCaps(),
 		GasLimits:       tx.GasLimits(),
 		EffectiveGasTip: tx.EffectiveGasTipValue(baseFee),
+		GasPrice:        tx.EffectiveGasPrice(baseFee), //[rollup-geth]
 	}
 
 	var err error
