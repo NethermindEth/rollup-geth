@@ -149,6 +149,7 @@ type Message struct {
 	// When SkipFromEOACheck is true, the message sender is not checked to be an EOA.
 	SkipFromEOACheck bool
 
+	//[rollup-geth]
 	EffectiveGasTip    *big.Int
 	EffectiveGasPrices types.VectorFeeBigint
 	EffectiveGasTips   types.VectorFeeBigint
@@ -165,7 +166,7 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 	msg := &Message{
 		Nonce:            tx.Nonce(),
 		GasLimit:         tx.Gas(),
-		GasPrice:         tx.EffectiveGasPrice(baseFee),
+		GasPrice:         tx.EffectiveGasPrice(baseFee), //[rollup-geth]
 		GasFeeCap:        new(big.Int).Set(tx.GasFeeCap()),
 		GasTipCap:        new(big.Int).Set(tx.GasTipCap()),
 		To:               tx.To(),
@@ -176,10 +177,11 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		SkipFromEOACheck: false,
 		BlobHashes:       tx.BlobHashes(),
 		BlobGasFeeCap:    tx.BlobGasFeeCap(),
-		GasFeeCaps:       tx.GasFeeCaps(),
-		GasTipCaps:       tx.GasTipCaps(),
-		GasLimits:        tx.GasLimits(),
 
+		//[rollup-geth]
+		GasFeeCaps:      tx.GasFeeCaps(),
+		GasTipCaps:      tx.GasTipCaps(),
+		GasLimits:       tx.GasLimits(),
 		EffectiveGasTip: tx.EffectiveGasTipValue(baseFee),
 	}
 
@@ -248,6 +250,7 @@ func (st *StateTransition) to() common.Address {
 	return *st.msg.To
 }
 
+// [rollup-geth]
 func (st *StateTransition) buyGasEIP4844() error {
 	mgval := new(big.Int).SetUint64(st.msg.GasLimit)
 	mgval.Mul(mgval, st.msg.GasPrice)
@@ -318,6 +321,7 @@ func (st *StateTransition) preCheck() error {
 		}
 	}
 
+	// [rollup-geth]
 	if preCheckGasErr := st.preCheckGas(); preCheckGasErr != nil {
 		return preCheckGasErr
 	}
@@ -436,6 +440,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		gasRefund = st.refundGas(params.RefundQuotientEIP3529)
 	}
 
+	// [rollup-geth]
 	st.payTheTip(rules, msg)
 
 	return &ExecutionResult{
@@ -461,6 +466,7 @@ func (st *StateTransition) refundGas(refundQuotient uint64) uint64 {
 	st.gasRemaining += refund
 
 	// Return ETH for remaining gas, exchanged at the original rate.
+	// [rollup-geth]
 	st.refundGasToAddress()
 
 	if st.evm.Config.Tracer != nil && st.evm.Config.Tracer.OnGasChange != nil && st.gasRemaining > 0 {

@@ -80,9 +80,9 @@ func (st *StateTransition) buyGasEIP7706() error {
 
 	// GAS_LIMIT * ACTUAL_FEE_PER_GAS
 	totalGasFees := st.msg.EffectiveGasPrices.VectorMul(gasLimits).Sum()
-	mgvalU256, _ := uint256.FromBig(totalGasFees)
+	totalGasFeesU256, _ := uint256.FromBig(totalGasFees)
 
-	st.state.SubBalance(st.msg.From, mgvalU256, tracing.BalanceDecreaseGasBuy)
+	st.state.SubBalance(st.msg.From, totalGasFeesU256, tracing.BalanceDecreaseGasBuy)
 	return nil
 }
 
@@ -113,7 +113,7 @@ func (st *StateTransition) preCheckGasEip4484() error {
 				return fmt.Errorf("%w: address %v, maxPriorityFeePerGas: %s, maxFeePerGas: %s", ErrTipAboveFeeCap,
 					msg.From.Hex(), msg.GasTipCap, msg.GasFeeCap)
 			}
-			// This will panic if baseFee is nil, but basefee presence is verified
+			// This will panic if baseFee is nil, but base fee presence is verified
 			// as part of header validation.
 			if msg.GasFeeCap.Cmp(st.evm.Context.BaseFee) < 0 {
 				return fmt.Errorf("%w: address %v, maxFeePerGas: %s, baseFee: %s", ErrFeeCapTooLow,
@@ -227,7 +227,7 @@ func (st *StateTransition) payTheTipEIP7706(rules params.Rules, msg *Message) {
 	}
 
 	// NOTE: Gas used by [execution, blob, calldata]
-	// Blob and calldata gas used is actually gas limit (becasue it is precomputed from tx data and known upfront)
+	// Blob and calldata gas used is actually gas limit (because it is precomputed from tx data and known upfront)
 	// Only execution gas is not known upfront and has to be determined while executing the transaction
 	gasUsed := msg.GasLimits
 	gasUsed[0] = st.gasUsed()

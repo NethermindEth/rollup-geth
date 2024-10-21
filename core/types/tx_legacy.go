@@ -21,7 +21,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/params"
 )
 
 // LegacyTx is the transaction data of the original Ethereum transactions.
@@ -123,24 +122,4 @@ func (tx *LegacyTx) encode(*bytes.Buffer) error {
 
 func (tx *LegacyTx) decode([]byte) error {
 	panic("decode called on LegacyTx)")
-}
-
-func (tx *LegacyTx) calldataGas() uint64 {
-	zeroBytes := bytes.Count(tx.Data, []byte{0x00})
-	nonZeroBytes := len(tx.Data) - zeroBytes
-	tokens := uint64(zeroBytes) + uint64(nonZeroBytes)*params.CalldataTokensPerNonZeroByte
-
-	return tokens * params.CalldataGasPerToken
-}
-
-func (tx *LegacyTx) gasLimits() VectorGasLimit {
-	return VectorGasLimit{tx.Gas, 0, tx.calldataGas()}
-}
-
-func (tx *LegacyTx) gasTipCaps() VectorFeeBigint {
-	return VectorFeeBigint{tx.GasPrice, big.NewInt(0), tx.GasPrice}
-}
-
-func (tx *LegacyTx) gasFeeCaps() VectorFeeBigint {
-	return VectorFeeBigint{tx.GasPrice, big.NewInt(0), tx.GasPrice}
 }

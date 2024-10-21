@@ -49,7 +49,8 @@ const (
 	AccessListTxType = 0x01
 	DynamicFeeTxType = 0x02
 	BlobTxType       = 0x03
-	VectorFeeTxType  = 0x04
+	//[rollup-geth]
+	VectorFeeTxType = 0x04
 )
 
 // Transaction is an Ethereum transaction.
@@ -102,6 +103,7 @@ type TxData interface {
 	encode(*bytes.Buffer) error
 	decode([]byte) error
 
+	//[rollup-geth]
 	gasTipCaps() VectorFeeBigint
 	gasFeeCaps() VectorFeeBigint
 	gasLimits() VectorGasLimit
@@ -211,6 +213,7 @@ func (tx *Transaction) decodeTyped(b []byte) (TxData, error) {
 		inner = new(DynamicFeeTx)
 	case BlobTxType:
 		inner = new(BlobTx)
+	// [rollup-geth]
 	case VectorFeeTxType:
 		inner = new(VectorFeeTx)
 	default:
@@ -295,20 +298,11 @@ func (tx *Transaction) AccessList() AccessList { return tx.inner.accessList() }
 // Gas returns the gas limit of the transaction.
 func (tx *Transaction) Gas() uint64 { return tx.inner.gas() }
 
-// Gas returns the gas limit of the transaction for each of [execution, blob, calldata] gas "type" respectively .
-func (tx *Transaction) GasLimits() VectorGasLimit { return tx.inner.gasLimits() }
-
 // GasPrice returns the gas price of the transaction.
 func (tx *Transaction) GasPrice() *big.Int { return new(big.Int).Set(tx.inner.gasPrice()) }
 
 // GasTipCap returns the gasTipCap per gas of the transaction.
 func (tx *Transaction) GasTipCap() *big.Int { return new(big.Int).Set(tx.inner.gasTipCap()) }
-
-// GasTipCaps returns the vector of tip caps per gas for each of [executon, blob, calldata] gas "types" respectively
-func (tx *Transaction) GasTipCaps() VectorFeeBigint { return tx.inner.gasTipCaps() }
-
-// GasFeeCaps returns the vector of fee caps per gas  for each of [executon, blob, calldata] gas "types" respectively
-func (tx *Transaction) GasFeeCaps() VectorFeeBigint { return tx.inner.gasFeeCaps() }
 
 // GasFeeCap returns the fee cap per gas of the transaction.
 func (tx *Transaction) GasFeeCap() *big.Int { return new(big.Int).Set(tx.inner.gasFeeCap()) }
@@ -403,39 +397,6 @@ func (tx *Transaction) EffectiveGasTipIntCmp(other *big.Int, baseFee *big.Int) i
 // EffectiveGasPrice returns the effective (actual) price per gas
 func (tx *Transaction) EffectiveGasPrice(baseFee *big.Int) *big.Int {
 	return tx.inner.effectiveGasPrice(new(big.Int), baseFee)
-}
-
-// EffectiveGasTip returnss the effective miner gasTipCap for the given base fees, per gas for each of [execution, blob, calldata] gas "type" respectively .
-func (tx *Transaction) EffectiveGasTips(baseFees VectorFeeBigint) VectorFeeBigint {
-	gasFeeCaps := tx.GasFeeCaps()
-	gasTipCaps := tx.GasTipCaps()
-	effectiveTips := NewVectorFeeBigInt()
-	for i, baseFee := range baseFees {
-		if baseFee == nil {
-			effectiveTips[i].Set(gasTipCaps[i])
-		} else {
-			effectiveTips[i] = math.BigMin(gasTipCaps[i], effectiveTips[i].Sub(gasFeeCaps[i], baseFee))
-		}
-	}
-
-	return effectiveTips
-}
-
-// EffectiveGasPrices returns the effective (actual) prices per gas for each of [execution, blob, calldata] gas "type" respectively .
-func (tx *Transaction) EffectiveGasPrices(baseFees VectorFeeBigint) VectorFeeBigint {
-	gasFeeCaps := tx.GasFeeCaps()
-	gasTipCaps := tx.GasTipCaps()
-	effectiveFees := NewVectorFeeBigInt()
-
-	for i, baseFee := range baseFees {
-		if baseFee == nil {
-			effectiveFees[i].Set(gasFeeCaps[i])
-		} else {
-			effectiveFees[i] = math.BigMin(effectiveFees[i].Add(gasTipCaps[i], baseFee), gasFeeCaps[i])
-		}
-	}
-
-	return effectiveFees
 }
 
 // BlobGas returns the blob gas limit of the transaction for blob transactions, 0 otherwise.

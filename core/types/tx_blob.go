@@ -169,6 +169,7 @@ func (tx *BlobTx) effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
 		return dst.Set(tx.GasFeeCap.ToBig())
 	}
 
+	//[rollup-geth]
 	return dst.Set(math.BigMin(dst.Add(tx.GasTipCap.ToBig(), baseFee), tx.GasFeeCap.ToBig()))
 }
 
@@ -239,24 +240,4 @@ func (tx *BlobTx) decode(input []byte) error {
 		Proofs:      inner.Proofs,
 	}
 	return nil
-}
-
-func (tx *BlobTx) gasTipCaps() VectorFeeBigint {
-	return VectorFeeBigint{tx.GasTipCap.ToBig(), big.NewInt(0), tx.GasTipCap.ToBig()}
-}
-
-func (tx *BlobTx) gasFeeCaps() VectorFeeBigint {
-	return VectorFeeBigint{tx.GasFeeCap.ToBig(), tx.BlobFeeCap.ToBig(), tx.GasFeeCap.ToBig()}
-}
-
-func (tx *BlobTx) calldataGas() uint64 {
-	zeroBytes := bytes.Count(tx.Data, []byte{0x00})
-	nonZeroBytes := len(tx.Data) - zeroBytes
-	tokens := uint64(zeroBytes) + uint64(nonZeroBytes)*params.CalldataTokensPerNonZeroByte
-
-	return tokens * params.CalldataGasPerToken
-}
-
-func (tx *BlobTx) gasLimits() VectorGasLimit {
-	return VectorGasLimit{tx.Gas, tx.blobGas(), tx.calldataGas()}
 }
