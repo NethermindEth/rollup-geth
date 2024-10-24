@@ -626,11 +626,12 @@ func ReadReceipts(db ethdb.Reader, hash common.Hash, number uint64, time uint64,
 	}
 	header := ReadHeader(db, hash, number)
 
+	//TODO: should this here be BaseFees vector?
 	var baseFee *big.Int
 	if header == nil {
 		baseFee = big.NewInt(0)
 	} else {
-		baseFee = header.BaseFee
+		baseFee = header.BaseFeeEIP1559()
 	}
 	// Compute effective blob gas price.
 	var blobGasPrice *big.Int

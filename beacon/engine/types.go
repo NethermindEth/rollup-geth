@@ -282,7 +282,6 @@ func ExecutableDataToBlockNoHash(data ExecutableData, versionedHashes []common.H
 		GasLimit:         data.GasLimit,
 		GasUsed:          data.GasUsed,
 		Time:             data.Timestamp,
-		BaseFee:          data.BaseFeePerGas,
 		Extra:            data.ExtraData,
 		MixDigest:        data.Random,
 		WithdrawalsHash:  withdrawalsRoot,
@@ -291,6 +290,10 @@ func ExecutableDataToBlockNoHash(data ExecutableData, versionedHashes []common.H
 		ParentBeaconRoot: beaconRoot,
 		RequestsHash:     requestsHash,
 	}
+
+	//TODO: what about [3]BaseFee
+	header.SetBaseFeesEIP1559(data.BaseFeePerGas)
+
 	return types.NewBlockWithHeader(header).
 			WithBody(types.Body{Transactions: txs, Uncles: nil, Withdrawals: data.Withdrawals, Requests: requests}).
 			WithWitness(data.ExecutionWitness),

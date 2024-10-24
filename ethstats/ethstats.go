@@ -790,9 +790,10 @@ func (s *Service) reportStats(conn *connWrapper) error {
 		sync := fullBackend.SyncProgress()
 		syncing = !sync.Done()
 
+		//TODO: EIP-7706 this should be base fees and gas tipcaps
 		price, _ := fullBackend.SuggestGasTipCap(context.Background())
 		gasprice = int(price.Uint64())
-		if basefee := fullBackend.CurrentHeader().BaseFee; basefee != nil {
+		if basefee := fullBackend.CurrentHeader().BaseFeeEIP1559(); basefee != nil {
 			gasprice += int(basefee.Uint64())
 		}
 	} else {

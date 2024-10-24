@@ -64,7 +64,7 @@ func TestWaitDeployed(t *testing.T) {
 
 		// Create the transaction
 		head, _ := backend.Client().HeaderByNumber(context.Background(), nil) // Should be child's, good enough
-		gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(params.GWei))
+		gasPrice := new(big.Int).Add(head.BaseFeeEIP1559(), big.NewInt(params.GWei))
 
 		tx := types.NewContractCreation(0, big.NewInt(0), test.gas, gasPrice, common.FromHex(test.code))
 		tx, _ = types.SignTx(tx, types.LatestSignerForChainID(big.NewInt(1337)), testKey)
@@ -110,7 +110,7 @@ func TestWaitDeployedCornerCases(t *testing.T) {
 	defer backend.Close()
 
 	head, _ := backend.Client().HeaderByNumber(context.Background(), nil) // Should be child's, good enough
-	gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(1))
+	gasPrice := new(big.Int).Add(head.BaseFeeEIP1559(), big.NewInt(1))
 
 	// Create a transaction to an account.
 	code := "6060604052600a8060106000396000f360606040526008565b00"

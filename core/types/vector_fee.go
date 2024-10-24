@@ -21,6 +21,15 @@ func NewVectorFeeBigInt() VectorFeeBigint {
 	return result
 }
 
+func (vec VectorFeeBigint) VectorCopy() VectorFeeBigint {
+	var result VectorFeeBigint
+	for i, v := range result {
+		result[i] = new(big.Int).Set(v)
+	}
+
+	return result
+}
+
 // TODO: Add nil checks
 func (vec VectorFeeBigint) Sum() *big.Int {
 	sum := big.NewInt(0)
@@ -79,6 +88,16 @@ func (vec VectorFeeBigint) VectorSubtractClampAtZero(other VectorFeeBigint) Vect
 	}
 
 	return result
+}
+
+func (vec VectorFeeBigint) VectorAllNotNil() bool {
+	for _, v := range vec {
+		if v == nil {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (vec VectorFeeBigint) VecBitLenAllZero() bool {

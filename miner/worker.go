@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip7706"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/stateless"
@@ -180,12 +181,19 @@ func (miner *Miner) prepareWork(genParams *generateParams, witness bool) (*envir
 	}
 	// Set baseFee and GasLimit if we are on an EIP-1559 chain
 	if miner.chainConfig.IsLondon(header.Number) {
-		header.BaseFee = eip1559.CalcBaseFee(miner.chainConfig, parent)
+		//[rollup-geth]
+		header.SetBaseFeesEIP1559(eip1559.CalcBaseFee(miner.chainConfig, parent))
 		if !miner.chainConfig.IsLondon(parent.Number) {
 			parentGasLimit := parent.GasLimit * miner.chainConfig.ElasticityMultiplier()
 			header.GasLimit = core.CalcGasLimit(parentGasLimit, miner.config.GasCeil)
 		}
 	}
+
+	if miner.chainConfig.IsR0() {
+		header.BaseFees = eip7706.CalcBaseFee(miner.chainConfig, parent)
+		//TODO: gas limit calc
+	}
+
 	// Run the consensus preparation with the default or customized consensus engine.
 	// Note that the `header.Time` may be changed.
 	if err := miner.engine.Prepare(miner.chain, header); err != nil {
@@ -415,8 +423,9 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 	filter := txpool.PendingFilter{
 		MinTip: uint256.MustFromBig(tip),
 	}
-	if env.header.BaseFee != nil {
-		filter.BaseFee = uint256.MustFromBig(env.header.BaseFee)
+	//NOTE: we didn't change tx pool ordering logic ATM, thus the pool we'll be filtered/ordered only by execution basefee
+	if env.header.BaseFeeEIP1559() != nil {
+		filter.BaseFee = uint256.MustFromBig(env.header.BaseFeeEIP1559())
 	}
 	if env.header.ExcessBlobGas != nil {
 		filter.BlobFee = uint256.MustFromBig(eip4844.CalcBlobFee(*env.header.ExcessBlobGas))
@@ -443,16 +452,16 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 	}
 	// Fill the block with all available pending transactions.
 	if len(localPlainTxs) > 0 || len(localBlobTxs) > 0 {
-		plainTxs := newTransactionsByPriceAndNonce(env.signer, localPlainTxs, env.header.BaseFee)
-		blobTxs := newTransactionsByPriceAndNonce(env.signer, localBlobTxs, env.header.BaseFee)
+		plainTxs := newTransactionsByPriceAndNonce(env.signer, localPlainTxs, env.header.BaseFeeEIP1559())
+		blobTxs := newTransactionsByPriceAndNonce(env.signer, localBlobTxs, env.header.BaseFeeEIP1559())
 
 		if err := miner.commitTransactions(env, plainTxs, blobTxs, interrupt); err != nil {
 			return err
 		}
 	}
 	if len(remotePlainTxs) > 0 || len(remoteBlobTxs) > 0 {
-		plainTxs := newTransactionsByPriceAndNonce(env.signer, remotePlainTxs, env.header.BaseFee)
-		blobTxs := newTransactionsByPriceAndNonce(env.signer, remoteBlobTxs, env.header.BaseFee)
+		plainTxs := newTransactionsByPriceAndNonce(env.signer, remotePlainTxs, env.header.BaseFeeEIP1559())
+		blobTxs := newTransactionsByPriceAndNonce(env.signer, remoteBlobTxs, env.header.BaseFeeEIP1559())
 
 		if err := miner.commitTransactions(env, plainTxs, blobTxs, interrupt); err != nil {
 			return err

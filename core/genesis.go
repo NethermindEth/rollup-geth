@@ -106,9 +106,11 @@ func ReadGenesis(db ethdb.Database) (*Genesis, error) {
 	genesis.Difficulty = genesisHeader.Difficulty
 	genesis.Mixhash = genesisHeader.MixDigest
 	genesis.Coinbase = genesisHeader.Coinbase
-	genesis.BaseFee = genesisHeader.BaseFee
 	genesis.ExcessBlobGas = genesisHeader.ExcessBlobGas
 	genesis.BlobGasUsed = genesisHeader.BlobGasUsed
+
+	//TODO: handle EIP-7706 here
+	genesis.BaseFee = genesisHeader.BaseFeeEIP1559()
 
 	return &genesis, nil
 }
@@ -428,23 +430,25 @@ func (g *Genesis) toBlockWithRoot(root common.Hash) *types.Block {
 		Extra:      g.ExtraData,
 		GasLimit:   g.GasLimit,
 		GasUsed:    g.GasUsed,
-		BaseFee:    g.BaseFee,
 		Difficulty: g.Difficulty,
 		MixDigest:  g.Mixhash,
 		Coinbase:   g.Coinbase,
 		Root:       root,
 	}
+	head.SetBaseFeesEIP1559(g.BaseFee)
+
 	if g.GasLimit == 0 {
 		head.GasLimit = params.GenesisGasLimit
 	}
 	if g.Difficulty == nil && g.Mixhash == (common.Hash{}) {
 		head.Difficulty = params.GenesisDifficulty
 	}
+	//TODO: handle EIP-7706 here
 	if g.Config != nil && g.Config.IsLondon(common.Big0) {
 		if g.BaseFee != nil {
-			head.BaseFee = g.BaseFee
+			head.SetBaseFeesEIP1559(g.BaseFee)
 		} else {
-			head.BaseFee = new(big.Int).SetUint64(params.InitialBaseFee)
+			head.SetBaseFeesEIP1559(new(big.Int).SetUint64(params.InitialBaseFee))
 		}
 	}
 	var (

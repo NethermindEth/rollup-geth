@@ -59,6 +59,7 @@ func convertPayload[T payloadType](payload T, parentRoot *zrntcommon.Root) (*typ
 		}
 		withdrawals = convertWithdrawals(p.Withdrawals, &header)
 		expectedHash = p.BlockHash
+		//TODO add case for new EIP-7706 header
 	default:
 		panic("unsupported block type")
 	}
@@ -86,7 +87,9 @@ func convertCapellaHeader(payload *capella.ExecutionPayload, h *types.Header) {
 	h.Extra = []byte(payload.ExtraData)
 	h.MixDigest = common.Hash(payload.PrevRandao)
 	h.Nonce = types.BlockNonce{}
-	h.BaseFee = (*uint256.Int)(&payload.BaseFeePerGas).ToBig()
+
+	//[rollup-geth]
+	h.SetBaseFeesEIP1559((*uint256.Int)(&payload.BaseFeePerGas).ToBig())
 }
 
 func convertDenebHeader(payload *deneb.ExecutionPayload, parentRoot common.Hash, h *types.Header) {
@@ -105,12 +108,16 @@ func convertDenebHeader(payload *deneb.ExecutionPayload, parentRoot common.Hash,
 	h.Extra = []byte(payload.ExtraData)
 	h.MixDigest = common.Hash(payload.PrevRandao)
 	h.Nonce = types.BlockNonce{}
-	h.BaseFee = (*uint256.Int)(&payload.BaseFeePerGas).ToBig()
 	// new in deneb
 	h.BlobGasUsed = (*uint64)(&payload.BlobGasUsed)
 	h.ExcessBlobGas = (*uint64)(&payload.ExcessBlobGas)
 	h.ParentBeaconRoot = &parentRoot
+
+	//[rollup-geth]
+	h.SetBaseFeesEIP1559((*uint256.Int)(&payload.BaseFeePerGas).ToBig())
 }
+
+// TODO: execution payload to new block header EIP-7706
 
 func convertTransactions(list zrntcommon.PayloadTransactions, execHeader *types.Header) ([]*types.Transaction, error) {
 	txs := make([]*types.Transaction, len(list))

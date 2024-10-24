@@ -131,12 +131,14 @@ func (i *bbInput) ToBlock() *types.Block {
 		Time:             i.Header.Time,
 		Extra:            i.Header.Extra,
 		MixDigest:        i.Header.MixDigest,
-		BaseFee:          i.Header.BaseFee,
 		WithdrawalsHash:  i.Header.WithdrawalsHash,
 		BlobGasUsed:      i.Header.BlobGasUsed,
 		ExcessBlobGas:    i.Header.ExcessBlobGas,
 		ParentBeaconRoot: i.Header.ParentBeaconBlockRoot,
 	}
+
+	//TODO: should this be BaseFees vector?
+	header.SetBaseFeesEIP1559(i.Header.BaseFee)
 
 	// Fill optional values.
 	if i.Header.OmmerHash != nil {

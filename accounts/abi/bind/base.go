@@ -260,6 +260,11 @@ func (c *BoundContract) Transfer(opts *TransactOpts) (*types.Transaction, error)
 	return c.transact(opts, &c.address, nil)
 }
 
+// TODO: actual impl here
+func (c *BoundContract) createVectorFeeTx(opts *TransactOpts, contract *common.Address, input []byte, head *types.Header) (*types.Transaction, error) {
+	return nil, nil
+}
+
 func (c *BoundContract) createDynamicTx(opts *TransactOpts, contract *common.Address, input []byte, head *types.Header) (*types.Transaction, error) {
 	// Normalize value
 	value := opts.Value
@@ -280,7 +285,7 @@ func (c *BoundContract) createDynamicTx(opts *TransactOpts, contract *common.Add
 	if gasFeeCap == nil {
 		gasFeeCap = new(big.Int).Add(
 			gasTipCap,
-			new(big.Int).Mul(head.BaseFee, big.NewInt(basefeeWiggleMultiplier)),
+			new(big.Int).Mul(head.BaseFeeEIP1559(), big.NewInt(basefeeWiggleMultiplier)),
 		)
 	}
 	if gasFeeCap.Cmp(gasTipCap) < 0 {
@@ -404,7 +409,9 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 		// Only query for basefee if gasPrice not specified
 		if head, errHead := c.transactor.HeaderByNumber(ensureContext(opts.Context), nil); errHead != nil {
 			return nil, errHead
-		} else if head.BaseFee != nil {
+		} else if head.IsEIP7706Ready() {
+			rawTx, err = c.createDynamicTx(opts, contract, input, head)
+		} else if head.BaseFeeEIP1559() != nil {
 			rawTx, err = c.createDynamicTx(opts, contract, input, head)
 		} else {
 			// Chain is not London ready -> use legacy transaction

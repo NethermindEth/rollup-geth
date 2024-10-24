@@ -86,13 +86,13 @@ func TestBlockGasLimits(t *testing.T) {
 		parent := &types.Header{
 			GasUsed:  tc.pGasLimit / 2,
 			GasLimit: tc.pGasLimit,
-			BaseFee:  initial,
+			BaseFees: types.VectorFeeBigint{initial},
 			Number:   big.NewInt(tc.pNum),
 		}
 		header := &types.Header{
 			GasUsed:  tc.gasLimit / 2,
 			GasLimit: tc.gasLimit,
-			BaseFee:  initial,
+			BaseFees: types.VectorFeeBigint{initial},
 			Number:   big.NewInt(tc.pNum + 1),
 		}
 		err := VerifyEIP1559Header(config(), parent, header)
@@ -122,7 +122,7 @@ func TestCalcBaseFee(t *testing.T) {
 			Number:   common.Big32,
 			GasLimit: test.parentGasLimit,
 			GasUsed:  test.parentGasUsed,
-			BaseFee:  big.NewInt(test.parentBaseFee),
+			BaseFees: types.VectorFeeBigint{big.NewInt(test.parentBaseFee)},
 		}
 		if have, want := CalcBaseFee(config(), parent), big.NewInt(test.expectedBaseFee); have.Cmp(want) != 0 {
 			t.Errorf("test %d: have %d  want %d, ", i, have, want)

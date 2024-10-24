@@ -82,8 +82,19 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		ProcessParentBlockHash(block.ParentHash(), vmenv, statedb)
 	}
 	// Iterate over and process the individual transactions
+	isEIP7706Block := p.config.IsR0()
 	for i, tx := range block.Transactions() {
-		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
+		var (
+			msg *Message
+			err error
+		)
+
+		if isEIP7706Block {
+			msg, err = TransactionToMessageEIP7706(tx, signer, header.BaseFees)
+		} else {
+			msg, err = TransactionToMessage(tx, signer, header.BaseFeeEIP1559())
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
@@ -193,7 +204,17 @@ func MakeReceipt(evm *vm.EVM, result *ExecutionResult, statedb *state.StateDB, b
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
 func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, error) {
-	msg, err := TransactionToMessage(tx, types.MakeSigner(config, header.Number, header.Time), header.BaseFee)
+	var (
+		msg *Message
+		err error
+	)
+
+	isEIP7706Block := config.IsR0()
+	if isEIP7706Block {
+		msg, err = TransactionToMessageEIP7706(tx, types.MakeSigner(config, header.Number, header.Time), header.BaseFees)
+	} else {
+		msg, err = TransactionToMessage(tx, types.MakeSigner(config, header.Number, header.Time), header.BaseFeeEIP1559())
+	}
 	if err != nil {
 		return nil, err
 	}

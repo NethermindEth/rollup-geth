@@ -112,12 +112,15 @@ func TestReimportMirroredState(t *testing.T) {
 }
 
 func TestSealHash(t *testing.T) {
-	have := SealHash(&types.Header{
+	h := &types.Header{
 		Difficulty: new(big.Int),
 		Number:     new(big.Int),
 		Extra:      make([]byte, 32+65),
-		BaseFee:    new(big.Int),
-	})
+	}
+	//[rollup-geth]
+	h.SetBaseFeesEIP1559(new(big.Int))
+
+	have := SealHash(h)
 	want := common.HexToHash("0xbd3d1fa43fbc4c5bfcc91b179ec92e2861df3654de60468beb908ff805359e8f")
 	if have != want {
 		t.Errorf("have %x, want %x", have, want)

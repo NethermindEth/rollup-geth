@@ -86,8 +86,8 @@ func genValueTx(nbytes int) func(int, *BlockGen) {
 		gas, _ := IntrinsicGas(data, nil, false, false, false, false)
 		signer := gen.Signer()
 		gasPrice := big.NewInt(0)
-		if gen.header.BaseFee != nil {
-			gasPrice = gen.header.BaseFee
+		if gen.header.BaseFeeEIP1559() != nil {
+			gasPrice = gen.header.BaseFeeEIP1559()
 		}
 		tx, _ := types.SignNewTx(benchRootKey, signer, &types.LegacyTx{
 			Nonce:    gen.TxNonce(benchRootAddr),
@@ -125,8 +125,8 @@ func genTxRing(naccounts int) func(int, *BlockGen) {
 		block := gen.PrevBlock(i - 1)
 		gas := block.GasLimit()
 		gasPrice := big.NewInt(0)
-		if gen.header.BaseFee != nil {
-			gasPrice = gen.header.BaseFee
+		if gen.header.BaseFeeEIP1559() != nil {
+			gasPrice = gen.header.BaseFeeEIP1559()
 		}
 		signer := gen.Signer()
 		for {
@@ -136,7 +136,7 @@ func genTxRing(naccounts int) func(int, *BlockGen) {
 			}
 			to := (from + 1) % naccounts
 			burn := new(big.Int).SetUint64(params.TxGas)
-			burn.Mul(burn, gen.header.BaseFee)
+			burn.Mul(burn, gen.header.BaseFeeEIP1559())
 			availableFunds.Sub(availableFunds, burn)
 			if availableFunds.Cmp(big.NewInt(1)) < 0 {
 				panic("not enough funds")

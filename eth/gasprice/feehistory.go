@@ -87,14 +87,17 @@ func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
 	config := oracle.backend.ChainConfig()
 
 	// Fill in base fee and next base fee.
-	if bf.results.baseFee = bf.header.BaseFee; bf.results.baseFee == nil {
+	if bf.results.baseFee = bf.header.BaseFeeEIP1559(); bf.results.baseFee == nil {
 		bf.results.baseFee = new(big.Int)
 	}
+
+	//TODO: handle EIP-7706 here
 	if config.IsLondon(big.NewInt(int64(bf.blockNumber + 1))) {
 		bf.results.nextBaseFee = eip1559.CalcBaseFee(config, bf.header)
 	} else {
 		bf.results.nextBaseFee = new(big.Int)
 	}
+
 	// Fill in blob base fee and next blob base fee.
 	if excessBlobGas := bf.header.ExcessBlobGas; excessBlobGas != nil {
 		bf.results.blobBaseFee = eip4844.CalcBlobFee(*excessBlobGas)

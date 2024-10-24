@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip7706"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -351,12 +352,14 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 	}
 	if !chain.Config().IsLondon(header.Number) {
 		// Verify BaseFee not present before EIP-1559 fork.
-		if header.BaseFee != nil {
-			return fmt.Errorf("invalid baseFee before fork: have %d, want <nil>", header.BaseFee)
+		if header.BaseFeeEIP1559() != nil {
+			return fmt.Errorf("invalid baseFee before fork: have %d, want <nil>", header.BaseFeeEIP1559())
 		}
 		if err := misc.VerifyGaslimit(parent.GasLimit, header.GasLimit); err != nil {
 			return err
 		}
+	} else if err := eip7706.VerifyEIP7706Header(chain.Config(), parent, header); err != nil {
+		return err
 	} else if err := eip1559.VerifyEIP1559Header(chain.Config(), parent, header); err != nil {
 		// Verify the header's EIP-1559 attributes.
 		return err
@@ -760,8 +763,10 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 		header.MixDigest,
 		header.Nonce,
 	}
-	if header.BaseFee != nil {
-		enc = append(enc, header.BaseFee)
+
+	//TODO: not sure about this one, should I have BaseFeesVector case handled as well?
+	if header.BaseFeeEIP1559() != nil {
+		enc = append(enc, header.BaseFeeEIP1559())
 	}
 	if header.WithdrawalsHash != nil {
 		panic("unexpected withdrawal hash value in clique")

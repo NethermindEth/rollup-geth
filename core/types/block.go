@@ -89,7 +89,7 @@ type Header struct {
 	Nonce       BlockNonce     `json:"nonce"`
 
 	// BaseFee was added by EIP-1559 and is ignored in legacy headers.
-	BaseFee *big.Int `json:"baseFeePerGas" rlp:"optional"`
+	baseFee *big.Int `json:"baseFeePerGas" rlp:"optional"`
 
 	// WithdrawalsHash was added by EIP-4895 and is ignored in legacy headers.
 	WithdrawalsHash *common.Hash `json:"withdrawalsRoot" rlp:"optional"`
@@ -105,6 +105,12 @@ type Header struct {
 
 	// RequestsHash was added by EIP-7685 and is ignored in legacy headers.
 	RequestsHash *common.Hash `json:"requestsRoot" rlp:"optional"`
+
+	//[rollup-geth]
+	//EIP-7706
+	BaseFees  VectorFeeBigint `json:"baseFees" rlp:"optional"`
+	GasLimits VectorGasLimit  `json:"gasLimits" rlp:"optional"`
+	ExcessGas VectorFeeBigint `json:"excessGas" rlp:"optional"`
 }
 
 // field type overrides for gencodec
@@ -133,8 +139,9 @@ var headerSize = common.StorageSize(reflect.TypeOf(Header{}).Size())
 // to approximate and limit the memory consumption of various caches.
 func (h *Header) Size() common.StorageSize {
 	var baseFeeBits int
-	if h.BaseFee != nil {
-		baseFeeBits = h.BaseFee.BitLen()
+	//TODO: make this EIP-7706 ready
+	if h.BaseFeeEIP1559() != nil {
+		baseFeeBits = h.BaseFeeEIP1559().BitLen()
 	}
 	return headerSize + common.StorageSize(len(h.Extra)+(h.Difficulty.BitLen()+h.Number.BitLen()+baseFeeBits)/8)
 }
@@ -155,10 +162,8 @@ func (h *Header) SanityCheck() error {
 	if eLen := len(h.Extra); eLen > 100*1024 {
 		return fmt.Errorf("too large block extradata: size %d", eLen)
 	}
-	if h.BaseFee != nil {
-		if bfLen := h.BaseFee.BitLen(); bfLen > 256 {
-			return fmt.Errorf("too large base fee: bitlen %d", bfLen)
-		}
+	if !h.BaseFees.VecBitLenAllLessEqThan256() {
+		return fmt.Errorf("too large base fee")
 	}
 	return nil
 }
@@ -176,6 +181,26 @@ func (h *Header) EmptyBody() bool {
 // EmptyReceipts returns true if there are no receipts for this header/block.
 func (h *Header) EmptyReceipts() bool {
 	return h.ReceiptHash == EmptyReceiptsHash
+}
+
+// NOTE: not sure if this or BaseFeeExecution is better name
+func (h *Header) BaseFeeEIP1559() *big.Int {
+	if len(h.BaseFees) == 0 {
+		return nil
+	}
+	if h.BaseFees[0] == nil {
+		return nil
+	}
+
+	return new(big.Int).Set(h.BaseFees[0])
+}
+
+func (h *Header) SetBaseFeesEIP1559(baseFee *big.Int) {
+	h.BaseFees = VectorFeeBigint{baseFee}
+}
+
+func (h *Header) IsEIP7706Ready() bool {
+	return h.BaseFees.VectorAllNotNil()
 }
 
 // Body is a simple (mutable, non-safe) data container for storing and moving
@@ -311,9 +336,6 @@ func CopyHeader(h *Header) *Header {
 	if cpy.Number = new(big.Int); h.Number != nil {
 		cpy.Number.Set(h.Number)
 	}
-	if h.BaseFee != nil {
-		cpy.BaseFee = new(big.Int).Set(h.BaseFee)
-	}
 	if len(h.Extra) > 0 {
 		cpy.Extra = make([]byte, len(h.Extra))
 		copy(cpy.Extra, h.Extra)
@@ -338,6 +360,9 @@ func CopyHeader(h *Header) *Header {
 		cpy.RequestsHash = new(common.Hash)
 		*cpy.RequestsHash = *h.RequestsHash
 	}
+
+	//[rollup-geth]
+	h.BaseFees.VectorCopy()
 	return &cpy
 }
 
@@ -412,11 +437,12 @@ func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
 func (b *Block) UncleHash() common.Hash   { return b.header.UncleHash }
 func (b *Block) Extra() []byte            { return common.CopyBytes(b.header.Extra) }
 
+// TODO: should this be BaseFees?
 func (b *Block) BaseFee() *big.Int {
-	if b.header.BaseFee == nil {
+	if b.header.BaseFeeEIP1559() == nil {
 		return nil
 	}
-	return new(big.Int).Set(b.header.BaseFee)
+	return new(big.Int).Set(b.header.BaseFeeEIP1559())
 }
 
 func (b *Block) BeaconRoot() *common.Hash { return b.header.ParentBeaconRoot }

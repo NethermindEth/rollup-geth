@@ -299,10 +299,8 @@ func (t *Transaction) EffectiveGasPrice(ctx context.Context) (*hexutil.Big, erro
 	if err != nil || header == nil {
 		return nil, err
 	}
-	if header.BaseFee == nil {
-		return (*hexutil.Big)(tx.GasPrice()), nil
-	}
-	return (*hexutil.Big)(math.BigMin(new(big.Int).Add(tx.GasTipCap(), header.BaseFee), tx.GasFeeCap())), nil
+
+	return (*hexutil.Big)(tx.EffectiveGasPrices(header.BaseFees).Sum()), nil
 }
 
 func (t *Transaction) MaxFeePerGas(ctx context.Context) *hexutil.Big {
@@ -364,14 +362,8 @@ func (t *Transaction) EffectiveTip(ctx context.Context) (*hexutil.Big, error) {
 	if err != nil || header == nil {
 		return nil, err
 	}
-	if header.BaseFee == nil {
-		return (*hexutil.Big)(tx.GasPrice()), nil
-	}
 
-	tip, err := tx.EffectiveGasTip(header.BaseFee)
-	if err != nil {
-		return nil, err
-	}
+	tip := tx.EffectiveGasTips(header.BaseFees).Sum()
 	return (*hexutil.Big)(tip), nil
 }
 

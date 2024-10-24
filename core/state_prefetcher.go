@@ -54,16 +54,28 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, c
 	)
 	// Iterate over and process the individual transactions
 	byzantium := p.config.IsByzantium(block.Number())
+	postEIP7706Block := p.config.IsR0()
+
 	for i, tx := range block.Transactions() {
 		// If block precaching was interrupted, abort
 		if interrupt != nil && interrupt.Load() {
 			return
 		}
+		var (
+			err error
+			msg *Message
+		)
+
 		// Convert the transaction into an executable message and pre-cache its sender
-		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
+		if postEIP7706Block {
+			msg, err = TransactionToMessageEIP7706(tx, signer, header.BaseFees)
+		} else {
+			msg, err = TransactionToMessage(tx, signer, header.BaseFeeEIP1559())
+		}
 		if err != nil {
 			return // Also invalid block, bail out
 		}
+
 		statedb.SetTxContext(tx.Hash(), i)
 		if err := precacheTransaction(msg, p.config, gaspool, statedb, header, evm); err != nil {
 			return // Ugh, something went horribly wrong, bail out
