@@ -46,6 +46,7 @@ type Options struct {
 	ErrorRatio float64 // Allowed overestimation ratio for faster estimation termination
 }
 
+// TODO: [rollup-geth] EIP-7706
 // Estimate returns the lowest possible gas limit that allows the transaction to
 // run successfully with the provided context options. It returns an error if the
 // transaction would always revert, or if there are unexpected failures.

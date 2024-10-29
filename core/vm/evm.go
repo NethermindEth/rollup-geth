@@ -75,10 +75,12 @@ type BlockContext struct {
 // All fields can change between transactions.
 type TxContext struct {
 	// Message information
-	Origin       common.Address      // Provides information for ORIGIN
-	GasPrice     *big.Int            // Provides information for GASPRICE (and is used to zero the basefee if NoBaseFee is set)
-	BlobHashes   []common.Hash       // Provides information for BLOBHASH
-	BlobFeeCap   *big.Int            // Is used to zero the blobbasefee if NoBaseFee is set
+	Origin     common.Address // Provides information for ORIGIN
+	GasPrice   *big.Int       // Provides information for GASPRICE (and is used to zero the basefee if NoBaseFee is set)
+	BlobHashes []common.Hash  // Provides information for BLOBHASH
+	//[rollup-geth]NOTE: as far as I can see  this zeroing out is only done in gasestimator/gasestimator.go
+	// Is used to zero the blobbasefee if NoBaseFee is set
+	BlobFeeCap   *big.Int
 	AccessEvents *state.AccessEvents // Capture all state accesses for this tx
 }
 

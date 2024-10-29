@@ -5,11 +5,20 @@ import (
 	"math/big"
 
 	// cmath "github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
+
+func TransactionToMessage(tx *types.Transaction, s types.Signer, h *types.Header, chainConfig *params.ChainConfig) (*Message, error) {
+	if chainConfig.IsEIP7706(h.Number, h.Time) {
+		return TransactionToMessageEIP7706(tx, s, h.BaseFees)
+	}
+
+	return TransactionToMessageEIP4844(tx, s, h.GetBaseFee())
+}
 
 // TransactionToMessage converts a transaction into a Message post EIP-7706
 func TransactionToMessageEIP7706(tx *types.Transaction, s types.Signer, baseFees types.VectorFeeBigint) (*Message, error) {
@@ -34,13 +43,17 @@ func TransactionToMessageEIP7706(tx *types.Transaction, s types.Signer, baseFees
 		EffectiveGasPrices: tx.EffectiveGasPrices(baseFees),
 	}
 
+	// TODO: [rollup-geth] EIP-7706 check this
+	//Do we indeed set msg.GasPrice to execution price? or?
+	msg.GasPrice = tx.EffectiveGasExecutionPrice(baseFees)
+
 	var err error
 	msg.From, err = types.Sender(s, tx)
 	return msg, err
 }
 
 func (st *StateTransition) preCheckGas() error {
-	if st.evm.ChainConfig().IsR0() {
+	if st.evm.ChainConfig().IsEIP7706(st.evm.Context.BlockNumber, st.evm.Context.Time) {
 		return st.preCheckGasEIP7706()
 	}
 
@@ -48,7 +61,7 @@ func (st *StateTransition) preCheckGas() error {
 }
 
 func (st *StateTransition) buyGas() error {
-	if !st.evm.ChainConfig().IsR0() {
+	if st.evm.ChainConfig().IsEIP7706(st.evm.Context.BlockNumber, st.evm.Context.Time) {
 		return st.buyGasEIP7706()
 	}
 
@@ -56,7 +69,7 @@ func (st *StateTransition) buyGas() error {
 }
 
 func (st *StateTransition) refundGasToAddress() {
-	if st.evm.ChainConfig().IsR0() {
+	if st.evm.ChainConfig().IsEIP7706(st.evm.Context.BlockNumber, st.evm.Context.Time) {
 		st.refundGasToAddressEIP7706()
 	} else {
 		st.refundGasToAddressEIP4844()
@@ -64,7 +77,7 @@ func (st *StateTransition) refundGasToAddress() {
 }
 
 func (st *StateTransition) payTheTip(rules params.Rules, msg *Message) {
-	if st.evm.ChainConfig().IsR0() {
+	if st.evm.ChainConfig().IsEIP7706(st.evm.Context.BlockNumber, st.evm.Context.Time) {
 		st.payTheTipEIP7706(rules, msg)
 	} else {
 		st.payTheTipEIP4844(rules, msg)
@@ -201,7 +214,7 @@ func (st *StateTransition) preCheckGasEIP4484() error {
 }
 
 func (st *StateTransition) preCheckGasEIP7706() error {
-	if !st.evm.ChainConfig().IsR0() {
+	if st.evm.ChainConfig().IsEIP7706(st.evm.Context.BlockNumber, st.evm.Context.Time) {
 		return nil
 	}
 
@@ -249,7 +262,10 @@ func (st *StateTransition) payTheTipEIP4844(rules params.Rules, msg *Message) {
 		return
 	}
 
-	effectiveTip := msg.EffectiveGasTip
+	effectiveTip := msg.GasPrice
+	if rules.IsLondon {
+		effectiveTip = math.BigMin(msg.GasTipCap, new(big.Int).Sub(msg.GasFeeCap, st.evm.Context.BaseFee))
+	}
 	effectiveTipU256, _ := uint256.FromBig(effectiveTip)
 	fee := new(uint256.Int).SetUint64(st.gasUsed())
 	fee.Mul(fee, effectiveTipU256)

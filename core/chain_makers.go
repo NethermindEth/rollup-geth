@@ -568,6 +568,9 @@ func (cm *chainMaker) makeHeader(parent *types.Block, state *state.StateDB, engi
 		header.BlobGasUsed = new(uint64)
 		header.ParentBeaconRoot = new(common.Hash)
 	}
+
+	//TODO: [rollup-geth] for testing purposes add generating EIP-7706 block headers
+
 	return header
 }
 

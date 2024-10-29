@@ -1,8 +1,11 @@
 package types
 
 import (
+	"fmt"
+	"io"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 )
 
@@ -21,11 +24,23 @@ func NewVectorFeeBigInt() VectorFeeBigint {
 	return result
 }
 
-// TODO: Add nil checks
+func (vec VectorFeeBigint) VectorCopy() VectorFeeBigint {
+	var result VectorFeeBigint
+	for i, v := range result {
+		if v != nil {
+			result[i] = new(big.Int).Set(v)
+		}
+	}
+
+	return result
+}
+
 func (vec VectorFeeBigint) Sum() *big.Int {
 	sum := big.NewInt(0)
 	for _, v := range vec {
-		sum = sum.Add(sum, v)
+		if v != nil {
+			sum = sum.Add(sum, v)
+		}
 	}
 
 	return sum
@@ -33,6 +48,14 @@ func (vec VectorFeeBigint) Sum() *big.Int {
 
 func (vec VectorFeeBigint) VectorAllLessOrEqual(other VectorFeeBigint) bool {
 	for i, v := range vec {
+		if bothValuesNil := v == nil && other[i] == nil; bothValuesNil {
+			continue
+		}
+
+		if onlyOneOfTheValuesNil := v == nil || other[i] == nil; onlyOneOfTheValuesNil {
+			return false
+		}
+
 		if v.Cmp(other[i]) > 0 {
 			return false
 		}
@@ -44,6 +67,20 @@ func (vec VectorFeeBigint) VectorAllLessOrEqual(other VectorFeeBigint) bool {
 func (vec VectorFeeBigint) VectorAdd(other VectorFeeBigint) VectorFeeBigint {
 	var result VectorFeeBigint
 	for i, v := range vec {
+		if bothValuesNil := v == nil && other[i] == nil; bothValuesNil {
+			continue
+		}
+
+		if v == nil {
+			result[i] = new(big.Int).Set(other[i])
+			continue
+		}
+
+		if other[i] == nil {
+			result[i] = new(big.Int).Set(v)
+			continue
+		}
+
 		result[i] = new(big.Int).Add(v, other[i])
 	}
 
@@ -53,6 +90,10 @@ func (vec VectorFeeBigint) VectorAdd(other VectorFeeBigint) VectorFeeBigint {
 func (vec VectorFeeBigint) VectorMul(other VectorFeeBigint) VectorFeeBigint {
 	var result VectorFeeBigint
 	for i, v := range vec {
+		if anyValueNil := v == nil || other[i] == nil; anyValueNil {
+			continue
+		}
+
 		result[i] = new(big.Int).Mul(v, other[i])
 	}
 
@@ -62,6 +103,19 @@ func (vec VectorFeeBigint) VectorMul(other VectorFeeBigint) VectorFeeBigint {
 func (vec VectorFeeBigint) VectorSubtract(other VectorFeeBigint) VectorFeeBigint {
 	var result VectorFeeBigint
 	for i, v := range vec {
+		if bothValuesNil := v == nil && other[i] == nil; bothValuesNil {
+			continue
+		}
+
+		if v == nil {
+			result[i] = new(big.Int).Sub(big.NewInt(0), other[i])
+			continue
+		}
+
+		if other[i] == nil {
+			result[i] = new(big.Int).Set(v)
+		}
+
 		result[i] = new(big.Int).Sub(v, other[i])
 	}
 
@@ -71,6 +125,11 @@ func (vec VectorFeeBigint) VectorSubtract(other VectorFeeBigint) VectorFeeBigint
 func (vec VectorFeeBigint) VectorSubtractClampAtZero(other VectorFeeBigint) VectorFeeBigint {
 	var result VectorFeeBigint
 	for i, v := range vec {
+		if anyValueNil := v == nil || other[i] == nil; anyValueNil {
+			result[i] = big.NewInt(0)
+			continue
+		}
+
 		if subWontProducePositiveValue := v.Cmp(other[i]) <= 0; subWontProducePositiveValue {
 			result[i] = big.NewInt(0)
 		} else {
@@ -83,6 +142,10 @@ func (vec VectorFeeBigint) VectorSubtractClampAtZero(other VectorFeeBigint) Vect
 
 func (vec VectorFeeBigint) VecBitLenAllZero() bool {
 	for _, v := range vec {
+		if v == nil {
+			continue
+		}
+
 		if v.BitLen() > 0 {
 			return false
 		}
@@ -93,6 +156,10 @@ func (vec VectorFeeBigint) VecBitLenAllZero() bool {
 
 func (vec VectorFeeBigint) VecBitLenAllLessEqThan256() bool {
 	for _, v := range vec {
+		if v == nil {
+			continue
+		}
+
 		if v.BitLen() > 256 {
 			return false
 		}

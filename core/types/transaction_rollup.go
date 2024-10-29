@@ -52,3 +52,7 @@ func (tx *Transaction) EffectiveGasPrices(baseFees VectorFeeBigint) VectorFeeBig
 func (tx *Transaction) EffectiveGasPrice(baseFee *big.Int) *big.Int {
 	return tx.inner.effectiveGasPrice(new(big.Int), baseFee)
 }
+
+func (tx *Transaction) EffectiveGasExecutionPrice(baseFees VectorFeeBigint) *big.Int {
+	return tx.EffectiveGasPrices(baseFees)[0]
+}

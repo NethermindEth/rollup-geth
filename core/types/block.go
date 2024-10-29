@@ -105,6 +105,10 @@ type Header struct {
 
 	// RequestsHash was added by EIP-7685 and is ignored in legacy headers.
 	RequestsHash *common.Hash `json:"requestsRoot" rlp:"optional"`
+
+	//[rollup-geth]
+	//Fields required by EIP-7706
+	BaseFees VectorFeeBigint `json:"baseFees" rlp:"optional"`
 }
 
 // field type overrides for gencodec
@@ -160,6 +164,8 @@ func (h *Header) SanityCheck() error {
 			return fmt.Errorf("too large base fee: bitlen %d", bfLen)
 		}
 	}
+
+	//TODO: [rollup-geth] validate vector of base fees
 	return nil
 }
 
@@ -176,6 +182,14 @@ func (h *Header) EmptyBody() bool {
 // EmptyReceipts returns true if there are no receipts for this header/block.
 func (h *Header) EmptyReceipts() bool {
 	return h.ReceiptHash == EmptyReceiptsHash
+}
+
+// TODO: [rollup-geth] Do we need BaseFees() as well?
+func (h *Header) GetBaseFee() *big.Int {
+	if h.BaseFee == nil {
+		return nil
+	}
+	return new(big.Int).Set(h.BaseFee)
 }
 
 // Body is a simple (mutable, non-safe) data container for storing and moving
@@ -338,6 +352,9 @@ func CopyHeader(h *Header) *Header {
 		cpy.RequestsHash = new(common.Hash)
 		*cpy.RequestsHash = *h.RequestsHash
 	}
+
+	//[rollup-geth] EIP-7706
+	cpy.BaseFees = h.BaseFees.VectorCopy()
 	return &cpy
 }
 
@@ -412,6 +429,7 @@ func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
 func (b *Block) UncleHash() common.Hash   { return b.header.UncleHash }
 func (b *Block) Extra() []byte            { return common.CopyBytes(b.header.Extra) }
 
+// TODO: [rollup-geth] Do we need BaseFees() as well?
 func (b *Block) BaseFee() *big.Int {
 	if b.header.BaseFee == nil {
 		return nil

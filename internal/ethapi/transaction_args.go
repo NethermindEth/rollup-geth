@@ -74,6 +74,8 @@ type TransactionArgs struct {
 
 	// This configures whether blobs are allowed to be passed.
 	blobSidecarAllowed bool
+
+	//TODO: [rollup-geth] add EIP-7706 missing fields
 }
 
 // from retrieves the transaction sender address.
@@ -417,6 +419,7 @@ func (args *TransactionArgs) CallDefaults(globalGasCap uint64, baseFee *big.Int,
 	return nil
 }
 
+// TODO: [rollup-geth] EIP-7706
 // ToMessage converts the transaction arguments to the Message type used by the
 // core evm. This method is used in calls and traces that do not require a real
 // live transaction.

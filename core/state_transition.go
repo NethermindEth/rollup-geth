@@ -149,8 +149,7 @@ type Message struct {
 	// When SkipFromEOACheck is true, the message sender is not checked to be an EOA.
 	SkipFromEOACheck bool
 
-	//[rollup-geth]
-	EffectiveGasTip    *big.Int
+	//[rollup-geth] EIP-7706
 	EffectiveGasPrices types.VectorFeeBigint
 	EffectiveGasTips   types.VectorFeeBigint
 
@@ -159,10 +158,8 @@ type Message struct {
 	GasTipCaps types.VectorFeeBigint
 }
 
-// TODO: go through all the references of this function call and see where we have to update to our newly added  TransactionToMessageEIP7706
-
 // TransactionToMessage converts a transaction into a Message.
-func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.Int) (*Message, error) {
+func TransactionToMessageEIP4844(tx *types.Transaction, s types.Signer, baseFee *big.Int) (*Message, error) {
 	msg := &Message{
 		Nonce:            tx.Nonce(),
 		GasLimit:         tx.Gas(),
@@ -177,12 +174,11 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		BlobHashes:       tx.BlobHashes(),
 		BlobGasFeeCap:    tx.BlobGasFeeCap(),
 
-		//[rollup-geth]
-		GasFeeCaps:      tx.GasFeeCaps(),
-		GasTipCaps:      tx.GasTipCaps(),
-		GasLimits:       tx.GasLimits(),
-		EffectiveGasTip: tx.EffectiveGasTipValue(baseFee),
-		GasPrice:        tx.EffectiveGasPrice(baseFee), //[rollup-geth]
+		//[rollup-geth] EIP-7706 added fields
+		GasFeeCaps: tx.GasFeeCaps(),
+		GasTipCaps: tx.GasTipCaps(),
+		GasLimits:  tx.GasLimits(),
+		GasPrice:   tx.EffectiveGasPrice(baseFee),
 	}
 
 	var err error
