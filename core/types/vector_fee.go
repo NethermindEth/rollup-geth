@@ -1,12 +1,8 @@
 package types
 
 import (
-	"fmt"
-	"io"
-	"math/big"
-
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
+	"math/big"
 )
 
 type (
@@ -138,6 +134,16 @@ func (vec VectorFeeBigint) VectorSubtractClampAtZero(other VectorFeeBigint) Vect
 	}
 
 	return result
+}
+
+func (vec VectorFeeBigint) VectorAllNil() bool {
+	for _, v := range vec {
+		if v != nil {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (vec VectorFeeBigint) VecBitLenAllZero() bool {

@@ -1051,6 +1051,7 @@ func (diff *StateOverride) Apply(statedb *state.StateDB, precompiles vm.Precompi
 	return nil
 }
 
+// TODO: [rollup-geth] EIP-7706 add missing fields
 // BlockOverrides is a set of header fields to override.
 type BlockOverrides struct {
 	Number        *hexutil.Big

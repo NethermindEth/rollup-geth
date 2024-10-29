@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	minBlobGasPrice            = big.NewInt(params.BlobTxMinBlobGasprice)
+	minBlobGasPrice            = big.NewInt(params.TxMinGasPrice)
 	blobGaspriceUpdateFraction = big.NewInt(params.BlobTxBlobGaspriceUpdateFraction)
 )
 
