@@ -106,12 +106,19 @@ type Header struct {
 	// RequestsHash was added by EIP-7685 and is ignored in legacy headers.
 	RequestsHash *common.Hash `json:"requestsRoot" rlp:"optional"`
 
-	//[rollup-geth]
-	//Fields required by EIP-7706
-	BaseFees VectorFeeBigint `json:"baseFees" rlp:"optional"`
+	//[rollup-geth] EIP-7706 required fields
+	GasLimits     VectorGasLimit `json:"gasLimits" rlp:"optional"`
+	GasUsedVector VectorGasLimit `json:"gasUsedVector" rlp:"optional"`
+	ExcessGas     VectorGasLimit `json:"excessGas" rlp:"optional"`
+
+	//NOTE: [rollup-geth] per EIP-7706 this field is not actually part of block header
+	//Not having this field as part of header would require even bigger code refactor
+	//thus, for time being I'm leaving this here and I want to double check if BaseFees where omitted deliberately
+	BaseFees VectorFeeBigint `rlp:"optional"`
 }
 
 // field type overrides for gencodec
+// TODO: [rollup-geth] add EIP-7706 fields here
 type headerMarshaling struct {
 	Difficulty    *hexutil.Big
 	Number        *hexutil.Big
@@ -165,7 +172,6 @@ func (h *Header) SanityCheck() error {
 		}
 	}
 
-	//TODO: [rollup-geth] validate vector of base fees
 	return nil
 }
 
@@ -355,6 +361,10 @@ func CopyHeader(h *Header) *Header {
 
 	//[rollup-geth] EIP-7706
 	cpy.BaseFees = h.BaseFees.VectorCopy()
+	cpy.GasLimits = h.GasLimits
+	cpy.ExcessGas = h.ExcessGas
+	cpy.GasUsedVector = h.GasUsedVector
+
 	return &cpy
 }
 

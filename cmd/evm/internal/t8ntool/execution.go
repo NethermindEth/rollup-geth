@@ -97,6 +97,8 @@ type stEnv struct {
 	ParentExcessBlobGas   *uint64                             `json:"parentExcessBlobGas,omitempty"`
 	ParentBlobGasUsed     *uint64                             `json:"parentBlobGasUsed,omitempty"`
 	ParentBeaconBlockRoot *common.Hash                        `json:"parentBeaconBlockRoot"`
+
+	//TODO: [rollup-geh] what about EIP-7706 fields
 }
 
 type stEnvMarshaling struct {

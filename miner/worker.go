@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip7706"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/stateless"
@@ -205,6 +206,26 @@ func (miner *Miner) prepareWork(genParams *generateParams, witness bool) (*envir
 		header.ExcessBlobGas = &excessBlobGas
 		header.ParentBeaconRoot = genParams.beaconRoot
 	}
+
+	if miner.chainConfig.IsEIP7706(header.Number, header.Time) {
+		parentGasLimits := parent.GasLimits
+		parentGasUsed := parent.GasUsedVector
+		parentExcessGas := parent.ExcessGas
+
+		if thisIsFirstEIP7706Block := !miner.chainConfig.IsEIP7706(parent.Number, parent.Time); thisIsFirstEIP7706Block {
+			parentGasLimits = types.VectorGasLimit{parent.GasLimit, params.MaxBlobGasPerBlock, parent.GasLimit / params.CallDataGasLimitRatio}
+			//TODO:[rollup-geth] EIP-7706 what about calldata for non EIP-7706 parent?
+			parentGasUsed = types.VectorGasLimit{parent.GasUsed, *parent.BlobGasUsed, 0}
+			// TODO: what about[rollup-geth] EIP-7706 execution excess gas and calldata excess gas for non EIP-7706 parent?
+			parentExcessGas = types.VectorGasLimit{0, *parent.ExcessBlobGas, 0}
+		}
+
+		//TODO: per EIP-7706 base_fees are not part of block header handle this properly
+		header.BaseFees = eip7706.CalcBaseFees(parentExcessGas, parentGasLimits)
+		header.ExcessGas = eip7706.CalcExecGas(parentGasUsed, parentExcessGas, parentGasLimits)
+		header.GasLimits = core.CalcGasLimits(parent.GasLimit, miner.config.GasCeil)
+	}
+
 	// Could potentially happen if starting to mine in an odd state.
 	// Note genParams.coinbase can be different with header.Coinbase
 	// since clique algorithm can modify the coinbase field in header.
@@ -415,6 +436,8 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 	filter := txpool.PendingFilter{
 		MinTip: uint256.MustFromBig(tip),
 	}
+
+	//TODO: [rollup-geth] this is used for fetching TXs from the pool, we don't have yet defined rules for multi-dimensional fee ordering
 	if env.header.BaseFee != nil {
 		filter.BaseFee = uint256.MustFromBig(env.header.BaseFee)
 	}

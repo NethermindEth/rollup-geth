@@ -1564,6 +1564,7 @@ func NewRPCPendingTransaction(tx *types.Transaction, current *types.Header, conf
 		blockNumber = uint64(0)
 		blockTime   = uint64(0)
 	)
+	//TODO:[rollup-geth] what about EIP-7706 base fees?
 	if current != nil {
 		baseFee = eip1559.CalcBaseFee(config, current)
 		blockNumber = current.Number.Uint64()

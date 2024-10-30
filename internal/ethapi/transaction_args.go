@@ -291,6 +291,7 @@ func (args *TransactionArgs) setLondonFeeDefaults(ctx context.Context, head *typ
 	return nil
 }
 
+// TODO: [rollup-geth] set EIP-7706 defaults
 // setBlobTxSidecar adds the blob tx
 func (args *TransactionArgs) setBlobTxSidecar(ctx context.Context) error {
 	// No blobs, we're done.
