@@ -42,6 +42,10 @@ func CalcBaseFees(parentExecGas, parentGasLimits types.VectorGasLimit) types.Vec
 func getBlockTargets(parentGasLimits types.VectorGasLimit) types.VectorGasLimit {
 	var targets types.VectorGasLimit
 	for i, limit := range parentGasLimits {
+		if params.LimitTargetRatios[i] == 0 {
+			targets[i] = 0
+			continue
+		}
 		targets[i] = limit / params.LimitTargetRatios[i]
 	}
 
