@@ -114,7 +114,7 @@ type Header struct {
 	//NOTE: [rollup-geth] per EIP-7706 this field is not actually part of block header
 	//Not having this field as part of header would require even bigger code refactor
 	//thus, for time being I'm leaving this here and I want to double check if BaseFees where omitted deliberately
-	BaseFees *VectorFeeBigint `rlp:"optional"`
+	BaseFees *VectorFeeBigint `rlp:"-" json:"-"`
 }
 
 // field type overrides for gencodec
