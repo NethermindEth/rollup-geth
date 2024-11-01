@@ -208,11 +208,21 @@ func (miner *Miner) prepareWork(genParams *generateParams, witness bool) (*envir
 	}
 
 	if miner.chainConfig.IsEIP7706(header.Number, header.Time) {
-		parentGasLimits := parent.GasLimits
-		parentGasUsed := parent.GasUsedVector
-		parentExcessGas := parent.ExcessGas
+		var (
+			parentGasUsed   types.VectorGasLimit
+			parentExcessGas types.VectorGasLimit
+			parentGasLimits types.VectorGasLimit
+		)
 
-		if thisIsFirstEIP7706Block := !miner.chainConfig.IsEIP7706(parent.Number, parent.Time); thisIsFirstEIP7706Block {
+		if parentBlockIsAlsoEIP7706 := miner.chainConfig.IsEIP7706(parent.Number, parent.Time); parentBlockIsAlsoEIP7706 {
+			if parentHeaderIsInvalid := parent.GasLimits == nil || parent.GasUsedVector == nil || parent.ExcessGas == nil; parentHeaderIsInvalid {
+				return nil, errors.New("parent block missing gas limits, gas used, or excess gas")
+			}
+
+			parentGasLimits = *parent.GasLimits
+			parentGasUsed = *parent.GasUsedVector
+			parentExcessGas = *parent.ExcessGas
+		} else {
 			parentGasLimits = types.VectorGasLimit{parent.GasLimit, params.MaxBlobGasPerBlock, parent.GasLimit / params.CallDataGasLimitRatio}
 			//TODO:[rollup-geth] EIP-7706 what about calldata for non EIP-7706 parent?
 			parentGasUsed = types.VectorGasLimit{parent.GasUsed, *parent.BlobGasUsed, 0}
@@ -220,10 +230,13 @@ func (miner *Miner) prepareWork(genParams *generateParams, witness bool) (*envir
 			parentExcessGas = types.VectorGasLimit{0, *parent.ExcessBlobGas, 0}
 		}
 
-		//TODO: per EIP-7706 base_fees are not part of block header handle this properly
-		header.BaseFees = eip7706.CalcBaseFees(parentExcessGas, parentGasLimits)
-		header.ExcessGas = eip7706.CalcExecGas(parentGasUsed, parentExcessGas, parentGasLimits)
-		header.GasLimits = core.CalcGasLimits(parent.GasLimit, miner.config.GasCeil)
+		baseFees := eip7706.CalcBaseFees(parentExcessGas, parentGasLimits)
+		excessGas := eip7706.CalcExecGas(parentGasUsed, parentExcessGas, parentGasLimits)
+		gasLimits := core.CalcGasLimits(parent.GasLimit, miner.config.GasCeil)
+
+		header.BaseFees = &baseFees
+		header.ExcessGas = &excessGas
+		header.GasLimits = &gasLimits
 	}
 
 	// Could potentially happen if starting to mine in an odd state.

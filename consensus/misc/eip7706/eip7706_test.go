@@ -2,6 +2,7 @@ package eip7706
 
 import (
 	"math/big"
+	"regexp"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -145,4 +146,186 @@ func TestCalcBaseFees(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestVerifyEIP7706Header tests the VerifyEIP7706Header function.
+func TestVerifyEIP7706Header(t *testing.T) {
+	// Helper function to create a default header.
+	defaultHeader := func() *types.Header {
+		header := &types.Header{
+			GasLimits:     &types.VectorGasLimit{params.GenesisGasLimit, params.MaxBlobGasPerBlock, params.GenesisGasLimit / params.CallDataGasLimitRatio},
+			GasUsedVector: &types.VectorGasLimit{0, 0, 0},
+			ExcessGas:     &types.VectorGasLimit{0, 0, 0},
+			// BaseFees are optional and can be set for testing.
+			BaseFees: nil,
+		}
+		return header
+	}
+
+	// Helper function to create a default parent header.
+	defaultParent := func() *types.Header {
+		blobGasUsed := uint64(0)
+		excessBlobGas := uint64(0)
+		parent := &types.Header{
+			GasLimit:      params.GenesisGasLimit,
+			GasUsed:       0,
+			BlobGasUsed:   &blobGasUsed,
+			ExcessBlobGas: &excessBlobGas,
+			GasLimits:     nil, // Pre-fork parent; GasLimits are nil.
+			GasUsedVector: nil,
+			ExcessGas:     nil,
+			BaseFees:      nil,
+			Number:        big.NewInt(0),
+		}
+		return parent
+	}
+
+	// Helper function to create a parent header that is an EIP-7706 block.
+	eip7706Parent := func() *types.Header {
+		parent := &types.Header{
+			GasLimits:     &types.VectorGasLimit{params.GenesisGasLimit, params.MaxBlobGasPerBlock, params.GenesisGasLimit / params.CallDataGasLimitRatio},
+			GasUsedVector: &types.VectorGasLimit{0, 0, 0},
+			ExcessGas:     &types.VectorGasLimit{0, 0, 0},
+			BaseFees:      nil,
+			Number:        big.NewInt(1),
+		}
+		return parent
+	}
+
+	// Define test cases.
+	tests := []struct {
+		name         string
+		parent       *types.Header
+		header       *types.Header
+		expectError  bool
+		errorMessage string
+	}{
+		{
+			name:        "Valid header with EIP-7706 parent",
+			parent:      eip7706Parent(),
+			header:      defaultHeader(),
+			expectError: false,
+		},
+		{
+			name:        "Valid header with pre-fork parent",
+			parent:      defaultParent(),
+			header:      defaultHeader(),
+			expectError: false,
+		},
+		{
+			name:   "Header missing ExcessGas",
+			parent: eip7706Parent(),
+			header: func() *types.Header {
+				h := defaultHeader()
+				h.ExcessGas = nil
+				return h
+			}(),
+			expectError:  true,
+			errorMessage: "header is missing excessGas",
+		},
+		{
+			name:   "Header missing GasUsedVector",
+			parent: eip7706Parent(),
+			header: func() *types.Header {
+				h := defaultHeader()
+				h.GasUsedVector = nil
+				return h
+			}(),
+			expectError:  true,
+			errorMessage: "header is missing gasUsedVector",
+		},
+		{
+			name:   "Header missing GasLimits",
+			parent: eip7706Parent(),
+			header: func() *types.Header {
+				h := defaultHeader()
+				h.GasLimits = nil
+				return h
+			}(),
+			expectError:  true,
+			errorMessage: "header is missing gasLimits",
+		},
+		{
+			name:   "Blob gas used exceeds MaxBlobGasPerBlock",
+			parent: eip7706Parent(),
+			header: func() *types.Header {
+				h := defaultHeader()
+				h.GasUsedVector[1] = params.MaxBlobGasPerBlock + params.BlobTxBlobGasPerBlob
+				return h
+			}(),
+			expectError:  true,
+			errorMessage: "blob gas used \\d+ exceeds maximum allowance \\d+",
+		},
+		{
+			name:   "Blob gas used not multiple of BlobTxBlobGasPerBlob",
+			parent: eip7706Parent(),
+			header: func() *types.Header {
+				h := defaultHeader()
+				h.GasUsedVector[1] = params.BlobTxBlobGasPerBlob + 1
+				return h
+			}(),
+			expectError:  true,
+			errorMessage: "blob gas used \\d+ not a multiple of blob gas per blob \\d+",
+		},
+		{
+			name:   "Calldata gas used not multiple of CalldataGasPerToken",
+			parent: eip7706Parent(),
+			header: func() *types.Header {
+				h := defaultHeader()
+				h.GasUsedVector[2] = params.CalldataGasPerToken + 1
+				return h
+			}(),
+			expectError:  true,
+			errorMessage: "calldata gas used \\d+ not a multiple of calldata gas per token \\d+",
+		},
+		{
+			name:   "Invalid excessGas",
+			parent: eip7706Parent(),
+			header: func() *types.Header {
+				h := defaultHeader()
+				h.ExcessGas[0] = 1 // Set an invalid excessGas value.
+				return h
+			}(),
+			expectError:  true,
+			errorMessage: "invalid excessGas",
+		},
+		{
+			name:   "Invalid baseFee",
+			parent: eip7706Parent(),
+			header: func() *types.Header {
+				h := defaultHeader()
+				// Set incorrect BaseFees for testing.
+				h.BaseFees = &types.VectorFeeBigint{big.NewInt(0), big.NewInt(1), big.NewInt(1)}
+				return h
+			}(),
+			expectError:  true,
+			errorMessage: "invalid baseFee",
+		},
+	}
+
+	// Run test cases.
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := VerifyEIP7706Header(tt.parent, tt.header)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if tt.errorMessage != "" {
+					if matched := matchErrorMessage(err, tt.errorMessage); !matched {
+						t.Errorf("unexpected error message: got %v, expected %v", err.Error(), tt.errorMessage)
+					}
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// Helper function to match error messages using regex.
+func matchErrorMessage(err error, pattern string) bool {
+	matched, _ := regexp.MatchString(pattern, err.Error())
+	return matched
 }

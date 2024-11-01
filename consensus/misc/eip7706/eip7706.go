@@ -1,6 +1,8 @@
 package eip7706
 
 import (
+	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -12,9 +14,69 @@ var (
 	gaspriceUpdateFraction = big.NewInt(params.BaseFeeUpdateFraction)
 )
 
-// TODO: [rollup-geth] implement this
 // VerifyEIP7706Header Verifies EIP-7706 header
 func VerifyEIP7706Header(parent, header *types.Header) error {
+	// Verify the header is not malformed
+	if header.ExcessGas == nil {
+		return errors.New("header is missing excessGas")
+	}
+	if header.GasUsedVector == nil {
+		return errors.New("header is missing gasUsedVector")
+	}
+	if header.GasLimits == nil {
+		return errors.New("header is missing gasLimits")
+	}
+
+	// Verify blob gas usage
+	blobGasUsed := header.GasUsedVector[1]
+	if blobGasUsed > params.MaxBlobGasPerBlock {
+		return fmt.Errorf("blob gas used %d exceeds maximum allowance %d", blobGasUsed, params.MaxBlobGasPerBlock)
+	}
+
+	if blobGasUsed%params.BlobTxBlobGasPerBlob != 0 {
+		return fmt.Errorf("blob gas used %d not a multiple of blob gas per blob %d", blobGasUsed, params.BlobTxBlobGasPerBlob)
+	}
+
+	// Verify calldata gas usage
+	calldataGasUsed := header.GasUsedVector[2]
+	if calldataGasUsed%params.CalldataGasPerToken != 0 {
+		return fmt.Errorf("calldata gas used %d not a multiple of calldata gas per token %d", calldataGasUsed, params.CalldataGasPerToken)
+	}
+
+	// Verify the excessGas is correct based on the parent header
+	var (
+		parentGasUsed   types.VectorGasLimit
+		parentExcessGas types.VectorGasLimit
+		parentGasLimits types.VectorGasLimit
+	)
+
+	if parentIsEIP7706Block := parent.GasUsedVector != nil && parent.ExcessGas != nil && parent.GasLimits != nil; parentIsEIP7706Block {
+		parentGasUsed = *parent.GasUsedVector
+		parentExcessGas = *parent.ExcessGas
+		parentGasLimits = *parent.GasLimits
+	} else {
+		parentGasLimits = types.VectorGasLimit{parent.GasLimit, params.MaxBlobGasPerBlock, parent.GasLimit / params.CallDataGasLimitRatio}
+		parentGasUsed = types.VectorGasLimit{parent.GasUsed, *parent.BlobGasUsed, parent.GasUsed / params.CallDataGasLimitRatio}
+		// TODO: what about[rollup-geth] EIP-7706 execution excess gas and calldata excess gas for non EIP-7706 parent?
+		parentExcessGas = types.VectorGasLimit{0, *parent.ExcessBlobGas, 0}
+	}
+
+	expectedExcessGas := CalcExecGas(parentGasUsed, parentExcessGas, parentGasLimits)
+	if !header.ExcessGas.VectorAllEq(expectedExcessGas) {
+		return errors.New("invalid excessGas")
+	}
+
+	// Verify base fees are correct based on the parent header
+	// NOTE: EIP-7706 doesn't specify base fees as part of header (they are not part of header protocol spec)
+	// But for convenience we do calculate them and store as part of the header
+	// So, if they do exist, make sure they are properly calculated
+	if header.BaseFees != nil {
+		expectedBaseFees := CalcBaseFees(parentExcessGas, parentGasLimits)
+		if !header.BaseFees.VectorAllEq(expectedBaseFees) {
+			return errors.New("invalid baseFee")
+		}
+	}
+
 	return nil
 }
 

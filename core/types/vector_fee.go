@@ -42,6 +42,24 @@ func (vec VectorFeeBigint) Sum() *big.Int {
 	return sum
 }
 
+func (vec VectorFeeBigint) VectorAllEq(other VectorFeeBigint) bool {
+	for i, v := range vec {
+		if bothValuesNil := v == nil && other[i] == nil; bothValuesNil {
+			continue
+		}
+
+		if onlyOneOfTheValuesNil := v == nil || other[i] == nil; onlyOneOfTheValuesNil {
+			return false
+		}
+
+		if v.Cmp(other[i]) != 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (vec VectorFeeBigint) VectorAllLessOrEqual(other VectorFeeBigint) bool {
 	for i, v := range vec {
 		if bothValuesNil := v == nil && other[i] == nil; bothValuesNil {
@@ -181,6 +199,16 @@ func (vec VectorGasLimit) ToVectorBigInt() VectorFeeBigint {
 	}
 
 	return result
+}
+
+func (vec VectorGasLimit) VectorAllEq(other VectorGasLimit) bool {
+	for i, v := range vec {
+		if v != other[i] {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (vec VectorGasLimit) VectorAdd(other VectorGasLimit) VectorGasLimit {

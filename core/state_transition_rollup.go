@@ -14,7 +14,10 @@ import (
 
 func TransactionToMessage(tx *types.Transaction, s types.Signer, h *types.Header, chainConfig *params.ChainConfig) (*Message, error) {
 	if chainConfig.IsEIP7706(h.Number, h.Time) {
-		return TransactionToMessageEIP7706(tx, s, h.BaseFees)
+		if h.BaseFees == nil {
+			return nil, fmt.Errorf("base fees not set")
+		}
+		return TransactionToMessageEIP7706(tx, s, *h.BaseFees)
 	}
 
 	return TransactionToMessageEIP4844(tx, s, h.GetBaseFee())
