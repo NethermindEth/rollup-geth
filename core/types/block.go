@@ -111,10 +111,11 @@ type Header struct {
 	GasUsedVector VectorGasLimit `json:"gasUsedVector" rlp:"optional"`
 	ExcessGas     VectorGasLimit `json:"excessGas" rlp:"optional"`
 
-	//NOTE: [rollup-geth] per EIP-7706 this field is not actually part of block header
-	//Not having this field as part of header would require even bigger code refactor
-	//thus, for time being I'm leaving this here and I want to double check if BaseFees where omitted deliberately
-	BaseFees VectorFeeBigint `rlp:"-" json:"-"`
+	//[rollup-geth] EIP-7706
+	//BaseFees field is actually not part of EIP-7706 protocol, but
+	//since it requires parent to calculate, geth precalculates this field  and stores it in local blockchain
+	//this is to reduce codebase complexity as well as DB read/write operations
+	BaseFees *VectorFeeBigint `rlp:"-" json:"-"`
 }
 
 // field type overrides for gencodec
@@ -140,6 +141,8 @@ func (h *Header) Hash() common.Hash {
 
 var headerSize = common.StorageSize(reflect.TypeOf(Header{}).Size())
 
+// TODO:[rollup-geth] what about EIP-7706 specific fields
+// Additionally why weren't EIP-4844 fields added to the size calculation?
 // Size returns the approximate memory used by all internal contents. It is used
 // to approximate and limit the memory consumption of various caches.
 func (h *Header) Size() common.StorageSize {
