@@ -11,6 +11,12 @@ type (
 	VectorGasLimit  [3]uint64
 )
 
+const (
+	ExecutionGasIndex = iota
+	BlobGasIndex
+	CalldataGasIndex
+)
+
 func NewVectorFeeBigInt() VectorFeeBigint {
 	var result VectorFeeBigint
 	for i := range result {

@@ -208,35 +208,15 @@ func (miner *Miner) prepareWork(genParams *generateParams, witness bool) (*envir
 	}
 
 	if miner.chainConfig.IsEIP7706(header.Number, header.Time) {
-		var (
-			parentGasUsed   types.VectorGasLimit
-			parentExcessGas types.VectorGasLimit
-			parentGasLimits types.VectorGasLimit
-		)
+		parentGasUsed, parentExcessGas, parentGasLimits := eip7706.SanitizeEIP7706Fields(parent)
 
-		if parentBlockIsAlsoEIP7706 := miner.chainConfig.IsEIP7706(parent.Number, parent.Time); parentBlockIsAlsoEIP7706 {
-			if parentHeaderIsInvalid := parent.GasLimits == nil || parent.GasUsedVector == nil || parent.ExcessGas == nil; parentHeaderIsInvalid {
-				return nil, errors.New("parent block missing gas limits, gas used, or excess gas")
-			}
-
-			parentGasLimits = *parent.GasLimits
-			parentGasUsed = *parent.GasUsedVector
-			parentExcessGas = *parent.ExcessGas
-		} else {
-			parentGasLimits = types.VectorGasLimit{parent.GasLimit, params.MaxBlobGasPerBlock, parent.GasLimit / params.CallDataGasLimitRatio}
-			//TODO:[rollup-geth] EIP-7706 what about calldata for non EIP-7706 parent?
-			parentGasUsed = types.VectorGasLimit{parent.GasUsed, *parent.BlobGasUsed, 0}
-			// TODO: what about[rollup-geth] EIP-7706 execution excess gas and calldata excess gas for non EIP-7706 parent?
-			parentExcessGas = types.VectorGasLimit{0, *parent.ExcessBlobGas, 0}
-		}
-
-		baseFees := eip7706.CalcBaseFees(parentExcessGas, parentGasLimits)
 		excessGas := eip7706.CalcExecGas(parentGasUsed, parentExcessGas, parentGasLimits)
 		gasLimits := core.CalcGasLimits(parent.GasLimit, miner.config.GasCeil)
+		baseFees := eip7706.CalcBaseFees(parentExcessGas, parentGasLimits)
 
-		header.BaseFees = &baseFees
 		header.ExcessGas = &excessGas
 		header.GasLimits = &gasLimits
+		header.BaseFees = &baseFees
 	}
 
 	// Could potentially happen if starting to mine in an odd state.

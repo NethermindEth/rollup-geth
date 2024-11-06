@@ -104,6 +104,17 @@ func TestCalcBaseFees(t *testing.T) {
 		expectedBaseFees types.VectorFeeBigint
 		description      string
 	}{
+
+		{
+			parentExecGas:   types.VectorGasLimit{0, 0, 0},
+			parentGasLimits: types.VectorGasLimit{0, 0, 0},
+			expectedBaseFees: types.VectorFeeBigint{
+				big.NewInt(1),
+				big.NewInt(1),
+				big.NewInt(1),
+			},
+			description: "All zero",
+		},
 		{
 			parentExecGas:   types.VectorGasLimit{10_000_000, 10_000_000, 10_000_000},
 			parentGasLimits: types.VectorGasLimit{20_000_000, 20_000_000, 40_000_000},

@@ -304,7 +304,7 @@ func (st *StateTransition) vectorGasUsed() types.VectorGasLimit {
 	// Blob and calldata gas used is actually same as their gas limits (because it is precomputed from tx data and known upfront)
 	// Only execution gas is not known upfront and has to be determined while executing the transaction
 	gasUsed := st.msg.GasLimits
-	gasUsed[0] = st.gasUsed()
+	gasUsed[types.ExecutionGasIndex] = st.gasUsed()
 
 	return gasUsed
 }

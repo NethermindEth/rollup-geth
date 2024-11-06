@@ -17,18 +17,12 @@ var (
 // VerifyEIP7706Header Verifies EIP-7706 header
 func VerifyEIP7706Header(parent, header *types.Header) error {
 	// Verify the header is not malformed
-	if header.ExcessGas == nil {
-		return errors.New("header is missing excessGas")
-	}
-	if header.GasUsedVector == nil {
-		return errors.New("header is missing gasUsedVector")
-	}
-	if header.GasLimits == nil {
-		return errors.New("header is missing gasLimits")
+	if fieldsNilErr := MakeSureEIP7706FieldsAreNonNil(header); fieldsNilErr != nil {
+		return fieldsNilErr
 	}
 
 	// Verify blob gas usage
-	blobGasUsed := header.GasUsedVector[1]
+	blobGasUsed := header.GasUsedVector[types.BlobGasIndex]
 	if blobGasUsed > params.MaxBlobGasPerBlock {
 		return fmt.Errorf("blob gas used %d exceeds maximum allowance %d", blobGasUsed, params.MaxBlobGasPerBlock)
 	}
@@ -38,29 +32,14 @@ func VerifyEIP7706Header(parent, header *types.Header) error {
 	}
 
 	// Verify calldata gas usage
-	calldataGasUsed := header.GasUsedVector[2]
+	calldataGasUsed := header.GasUsedVector[types.CalldataGasIndex]
 	if calldataGasUsed%params.CalldataGasPerToken != 0 {
 		return fmt.Errorf("calldata gas used %d not a multiple of calldata gas per token %d", calldataGasUsed, params.CalldataGasPerToken)
 	}
 
+	parentGasUsed, parentExcessGas, parentGasLimits := SanitizeEIP7706Fields(parent)
+
 	// Verify the excessGas is correct based on the parent header
-	var (
-		parentGasUsed   types.VectorGasLimit
-		parentExcessGas types.VectorGasLimit
-		parentGasLimits types.VectorGasLimit
-	)
-
-	if parentIsEIP7706Block := parent.GasUsedVector != nil && parent.ExcessGas != nil && parent.GasLimits != nil; parentIsEIP7706Block {
-		parentGasUsed = *parent.GasUsedVector
-		parentExcessGas = *parent.ExcessGas
-		parentGasLimits = *parent.GasLimits
-	} else {
-		parentGasLimits = types.VectorGasLimit{parent.GasLimit, params.MaxBlobGasPerBlock, parent.GasLimit / params.CallDataGasLimitRatio}
-		parentGasUsed = types.VectorGasLimit{parent.GasUsed, *parent.BlobGasUsed, parent.GasUsed / params.CallDataGasLimitRatio}
-		// TODO: what about[rollup-geth] EIP-7706 execution excess gas and calldata excess gas for non EIP-7706 parent?
-		parentExcessGas = types.VectorGasLimit{0, *parent.ExcessBlobGas, 0}
-	}
-
 	expectedExcessGas := CalcExecGas(parentGasUsed, parentExcessGas, parentGasLimits)
 	if !header.ExcessGas.VectorAllEq(expectedExcessGas) {
 		return errors.New("invalid excessGas")
@@ -80,11 +59,55 @@ func VerifyEIP7706Header(parent, header *types.Header) error {
 	return nil
 }
 
-// CalcExecGas calculates excess gas given parent block gas usage and target parent target gas usage
-func CalcExecGas(parentGasUsed, parentExecGas, parentGasLimits types.VectorGasLimit) types.VectorGasLimit {
-	excessGas := parentExecGas.VectorAdd(parentGasUsed)
+// MakeSureEIP7706FieldsAreNonNil makes sure EIP-7706 header fields are non-nil
+func MakeSureEIP7706FieldsAreNonNil(header *types.Header) error {
+	if header == nil {
+		return errors.New("header is nil")
+	}
+	if header.ExcessGas == nil {
+		return errors.New("header is missing excessGas")
+	}
+	if header.GasUsedVector == nil {
+		return errors.New("header is missing gasUsedVector")
+	}
+	if header.GasLimits == nil {
+		return errors.New("header is missing gasLimits")
+	}
 
-	return excessGas.VectorSubtractClampAtZero(getBlockTargets(parentGasLimits))
+	return nil
+}
+
+// SanitizeEIP7706Fields either returns the EIP-7706 existing field values or fallbacks to defaults
+func SanitizeEIP7706Fields(header *types.Header) (types.VectorGasLimit, types.VectorGasLimit, types.VectorGasLimit) {
+	if noEIP7706FieldsInHeaderErr := MakeSureEIP7706FieldsAreNonNil(header); noEIP7706FieldsInHeaderErr != nil {
+		//TODO: are these defaults ok?
+		gasUsed := types.VectorGasLimit{header.GasUsed, *header.BlobGasUsed, header.GasUsed / params.CallDataGasLimitRatio}
+		excessGas := types.VectorGasLimit{0, *header.ExcessBlobGas, 0}
+		gasLimits := types.VectorGasLimit{header.GasLimit, params.MaxBlobGasPerBlock, header.GasLimit / params.CallDataGasLimitRatio}
+
+		return gasUsed, excessGas, gasLimits
+	}
+
+	return *header.GasUsedVector, *header.ExcessGas, *header.GasLimits
+}
+
+// CalcBaseFeesFromParentHeader calculates base fees per EIP-7706 given parent header
+func CalcBaseFeesFromParentHeader(config *params.ChainConfig, parent *types.Header) (*types.VectorFeeBigint, error) {
+	if parent == nil {
+		return nil, errors.New("parent header is nil")
+	}
+
+	if !config.IsEIP7706(parent.Number, parent.Time) {
+		return nil, errors.New("Parent is not an EIP-7706 block")
+	}
+
+	if err := MakeSureEIP7706FieldsAreNonNil(parent); err != nil {
+		return nil, err
+	}
+
+	baseFees := CalcBaseFees(*parent.ExcessGas, *parent.GasLimits)
+
+	return &baseFees, nil
 }
 
 // CalcBaseFees  calculates vector of the base fees for current block header given parent excess gas and targets
@@ -95,10 +118,23 @@ func CalcBaseFees(parentExecGas, parentGasLimits types.VectorGasLimit) types.Vec
 	for i, execGas := range parentExecGas {
 		target := big.NewInt(int64(targets[i]))
 		target = target.Mul(target, gaspriceUpdateFraction)
+
+		if target.Sign() == 0 {
+			baseFees[i] = new(big.Int).Set(minTxGasPrice)
+			continue
+		}
+
 		baseFees[i] = fakeExponential(minTxGasPrice, big.NewInt(int64(execGas)), target)
 	}
 
 	return baseFees
+}
+
+// CalcExecGas calculates excess gas given parent block gas usage and target parent target gas usage
+func CalcExecGas(parentGasUsed, parentExecGas, parentGasLimits types.VectorGasLimit) types.VectorGasLimit {
+	excessGas := parentExecGas.VectorAdd(parentGasUsed)
+
+	return excessGas.VectorSubtractClampAtZero(getBlockTargets(parentGasLimits))
 }
 
 func getBlockTargets(parentGasLimits types.VectorGasLimit) types.VectorGasLimit {
@@ -121,6 +157,7 @@ func fakeExponential(factor, numerator, denominator *big.Int) *big.Int {
 		output = new(big.Int)
 		accum  = new(big.Int).Mul(factor, denominator)
 	)
+
 	for i := 1; accum.Sign() > 0; i++ {
 		output.Add(output, accum)
 
