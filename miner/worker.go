@@ -210,13 +210,9 @@ func (miner *Miner) prepareWork(genParams *generateParams, witness bool) (*envir
 	if miner.chainConfig.IsEIP7706(header.Number, header.Time) {
 		parentGasUsed, parentExcessGas, parentGasLimits := eip7706.SanitizeEIP7706Fields(parent)
 
-		excessGas := eip7706.CalcExecGas(parentGasUsed, parentExcessGas, parentGasLimits)
-		gasLimits := core.CalcGasLimits(parent.GasLimit, miner.config.GasCeil)
-		baseFees := eip7706.CalcBaseFees(parentExcessGas, parentGasLimits)
-
-		header.ExcessGas = &excessGas
-		header.GasLimits = &gasLimits
-		header.BaseFees = &baseFees
+		header.ExcessGas = eip7706.CalcExecGas(parentGasUsed, parentExcessGas, parentGasLimits)
+		header.GasLimits = core.CalcGasLimits(parent.GasLimit, miner.config.GasCeil)
+		header.BaseFees = eip7706.CalcBaseFees(parentExcessGas, parentGasLimits)
 	}
 
 	// Could potentially happen if starting to mine in an odd state.

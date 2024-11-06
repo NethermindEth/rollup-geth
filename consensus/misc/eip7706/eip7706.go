@@ -88,7 +88,7 @@ func SanitizeEIP7706Fields(header *types.Header) (types.VectorGasLimit, types.Ve
 		return gasUsed, excessGas, gasLimits
 	}
 
-	return *header.GasUsedVector, *header.ExcessGas, *header.GasLimits
+	return header.GasUsedVector, header.ExcessGas, header.GasLimits
 }
 
 // CalcBaseFeesFromParentHeader calculates base fees per EIP-7706 given parent header
@@ -105,7 +105,7 @@ func CalcBaseFeesFromParentHeader(config *params.ChainConfig, parent *types.Head
 		return nil, err
 	}
 
-	baseFees := CalcBaseFees(*parent.ExcessGas, *parent.GasLimits)
+	baseFees := CalcBaseFees(parent.ExcessGas, parent.GasLimits)
 
 	return &baseFees, nil
 }

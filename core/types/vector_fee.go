@@ -6,9 +6,9 @@ import (
 )
 
 type (
-	VectorFeeUint   [3]*uint256.Int
-	VectorFeeBigint [3]*big.Int
-	VectorGasLimit  [3]uint64
+	VectorFeeUint   []*uint256.Int
+	VectorFeeBigint []*big.Int
+	VectorGasLimit  []uint64
 )
 
 const (
@@ -17,8 +17,10 @@ const (
 	CalldataGasIndex
 )
 
+const VectorFeeTypesCount = 3
+
 func NewVectorFeeBigInt() VectorFeeBigint {
-	var result VectorFeeBigint
+	result := make(VectorFeeBigint, VectorFeeTypesCount)
 	for i := range result {
 		result[i] = new(big.Int)
 	}
@@ -27,8 +29,8 @@ func NewVectorFeeBigInt() VectorFeeBigint {
 }
 
 func (vec VectorFeeBigint) VectorCopy() VectorFeeBigint {
-	var result VectorFeeBigint
-	for i, v := range result {
+	result := make(VectorFeeBigint, VectorFeeTypesCount)
+	for i, v := range vec {
 		if v != nil {
 			result[i] = new(big.Int).Set(v)
 		}
@@ -85,7 +87,7 @@ func (vec VectorFeeBigint) VectorAllLessOrEqual(other VectorFeeBigint) bool {
 }
 
 func (vec VectorFeeBigint) VectorAdd(other VectorFeeBigint) VectorFeeBigint {
-	var result VectorFeeBigint
+	result := make(VectorFeeBigint, VectorFeeTypesCount)
 	for i, v := range vec {
 		if bothValuesNil := v == nil && other[i] == nil; bothValuesNil {
 			continue
@@ -108,7 +110,7 @@ func (vec VectorFeeBigint) VectorAdd(other VectorFeeBigint) VectorFeeBigint {
 }
 
 func (vec VectorFeeBigint) VectorMul(other VectorFeeBigint) VectorFeeBigint {
-	var result VectorFeeBigint
+	result := make(VectorFeeBigint, VectorFeeTypesCount)
 	for i, v := range vec {
 		if anyValueNil := v == nil || other[i] == nil; anyValueNil {
 			continue
@@ -121,7 +123,7 @@ func (vec VectorFeeBigint) VectorMul(other VectorFeeBigint) VectorFeeBigint {
 }
 
 func (vec VectorFeeBigint) VectorSubtract(other VectorFeeBigint) VectorFeeBigint {
-	var result VectorFeeBigint
+	result := make(VectorFeeBigint, VectorFeeTypesCount)
 	for i, v := range vec {
 		if bothValuesNil := v == nil && other[i] == nil; bothValuesNil {
 			continue
@@ -134,6 +136,7 @@ func (vec VectorFeeBigint) VectorSubtract(other VectorFeeBigint) VectorFeeBigint
 
 		if other[i] == nil {
 			result[i] = new(big.Int).Set(v)
+			continue
 		}
 
 		result[i] = new(big.Int).Sub(v, other[i])
@@ -143,7 +146,7 @@ func (vec VectorFeeBigint) VectorSubtract(other VectorFeeBigint) VectorFeeBigint
 }
 
 func (vec VectorFeeBigint) VectorSubtractClampAtZero(other VectorFeeBigint) VectorFeeBigint {
-	var result VectorFeeBigint
+	result := make(VectorFeeBigint, VectorFeeTypesCount)
 	for i, v := range vec {
 		if anyValueNil := v == nil || other[i] == nil; anyValueNil {
 			result[i] = big.NewInt(0)
@@ -199,7 +202,7 @@ func (vec VectorFeeBigint) VecBitLenAllLessEqThan256() bool {
 }
 
 func (vec VectorGasLimit) ToVectorBigInt() VectorFeeBigint {
-	var result VectorFeeBigint
+	result := make(VectorFeeBigint, VectorFeeTypesCount)
 	for i, v := range vec {
 		result[i] = new(big.Int).SetUint64(v)
 	}
@@ -218,7 +221,7 @@ func (vec VectorGasLimit) VectorAllEq(other VectorGasLimit) bool {
 }
 
 func (vec VectorGasLimit) VectorAdd(other VectorGasLimit) VectorGasLimit {
-	var result VectorGasLimit
+	result := make(VectorGasLimit, VectorFeeTypesCount)
 	for i, v := range vec {
 		result[i] = v + other[i]
 	}
@@ -227,7 +230,7 @@ func (vec VectorGasLimit) VectorAdd(other VectorGasLimit) VectorGasLimit {
 }
 
 func (vec VectorGasLimit) VectorSubtract(other VectorGasLimit) VectorGasLimit {
-	var result VectorGasLimit
+	result := make(VectorGasLimit, VectorFeeTypesCount)
 	for i, v := range vec {
 		result[i] = v - other[i]
 	}
@@ -236,7 +239,7 @@ func (vec VectorGasLimit) VectorSubtract(other VectorGasLimit) VectorGasLimit {
 }
 
 func (vec VectorGasLimit) VectorSubtractClampAtZero(other VectorGasLimit) VectorGasLimit {
-	var result VectorGasLimit
+	result := make(VectorGasLimit, VectorFeeTypesCount)
 	for i, v := range vec {
 		if v <= other[i] {
 			result[i] = 0

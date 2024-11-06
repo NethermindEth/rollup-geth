@@ -3,6 +3,7 @@ package eip7706
 import (
 	"math/big"
 	"regexp"
+	"slices"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -46,7 +47,7 @@ func TestGetBlockTargets(t *testing.T) {
 		params.LimitTargetRatios = tt.limitTargetRatios // Set the ratios for the test
 		got := getBlockTargets(tt.parentGasLimits)
 
-		if got != tt.want {
+		if !slices.Equal(tt.want, got) {
 			t.Errorf("test %d: getBlockTargets(%v) = %v; want %v",
 				i, tt.parentGasLimits, got, tt.want)
 		}
@@ -89,7 +90,7 @@ func TestCalcExecGas(t *testing.T) {
 	for i, tt := range tests {
 		got := CalcExecGas(tt.parentGasUsed, tt.parentExecGas, tt.parentGasLimits)
 
-		if got != tt.want {
+		if !slices.Equal(tt.want, got) {
 			t.Errorf("test %d: CalcExecGas(%v, %v, %v) = %v; want %v",
 				i, tt.parentGasUsed, tt.parentExecGas, tt.parentGasLimits, got, tt.want)
 		}
@@ -164,9 +165,9 @@ func TestVerifyEIP7706Header(t *testing.T) {
 	// Helper function to create a default header.
 	defaultHeader := func() *types.Header {
 		header := &types.Header{
-			GasLimits:     &types.VectorGasLimit{params.GenesisGasLimit, params.MaxBlobGasPerBlock, params.GenesisGasLimit / params.CallDataGasLimitRatio},
-			GasUsedVector: &types.VectorGasLimit{0, 0, 0},
-			ExcessGas:     &types.VectorGasLimit{0, 0, 0},
+			GasLimits:     types.VectorGasLimit{params.GenesisGasLimit, params.MaxBlobGasPerBlock, params.GenesisGasLimit / params.CallDataGasLimitRatio},
+			GasUsedVector: types.VectorGasLimit{0, 0, 0},
+			ExcessGas:     types.VectorGasLimit{0, 0, 0},
 			// BaseFees are optional and can be set for testing.
 			BaseFees: nil,
 		}
@@ -194,9 +195,9 @@ func TestVerifyEIP7706Header(t *testing.T) {
 	// Helper function to create a parent header that is an EIP-7706 block.
 	eip7706Parent := func() *types.Header {
 		parent := &types.Header{
-			GasLimits:     &types.VectorGasLimit{params.GenesisGasLimit, params.MaxBlobGasPerBlock, params.GenesisGasLimit / params.CallDataGasLimitRatio},
-			GasUsedVector: &types.VectorGasLimit{0, 0, 0},
-			ExcessGas:     &types.VectorGasLimit{0, 0, 0},
+			GasLimits:     types.VectorGasLimit{params.GenesisGasLimit, params.MaxBlobGasPerBlock, params.GenesisGasLimit / params.CallDataGasLimitRatio},
+			GasUsedVector: types.VectorGasLimit{0, 0, 0},
+			ExcessGas:     types.VectorGasLimit{0, 0, 0},
 			BaseFees:      nil,
 			Number:        big.NewInt(1),
 		}
@@ -306,7 +307,7 @@ func TestVerifyEIP7706Header(t *testing.T) {
 			header: func() *types.Header {
 				h := defaultHeader()
 				// Set incorrect BaseFees for testing.
-				h.BaseFees = &types.VectorFeeBigint{big.NewInt(0), big.NewInt(1), big.NewInt(1)}
+				h.BaseFees = types.VectorFeeBigint{big.NewInt(0), big.NewInt(1), big.NewInt(1)}
 				return h
 			}(),
 			expectError:  true,

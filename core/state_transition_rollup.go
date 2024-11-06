@@ -17,7 +17,7 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, h *types.Header
 		if h.BaseFees == nil {
 			return nil, fmt.Errorf("base fees not set")
 		}
-		return TransactionToMessageEIP7706(tx, s, *h.BaseFees)
+		return TransactionToMessageEIP7706(tx, s, h.BaseFees)
 	}
 
 	return TransactionToMessageEIP4844(tx, s, h.GetBaseFee())

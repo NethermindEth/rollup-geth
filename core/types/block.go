@@ -107,14 +107,14 @@ type Header struct {
 	RequestsHash *common.Hash `json:"requestsRoot" rlp:"optional"`
 
 	//[rollup-geth] EIP-7706 required fields
-	GasLimits     *VectorGasLimit `json:"gasLimits" rlp:"optional"`
-	GasUsedVector *VectorGasLimit `json:"gasUsedVector" rlp:"optional"`
-	ExcessGas     *VectorGasLimit `json:"excessGas" rlp:"optional"`
+	GasLimits     VectorGasLimit `json:"gasLimits" rlp:"optional"`
+	GasUsedVector VectorGasLimit `json:"gasUsedVector" rlp:"optional"`
+	ExcessGas     VectorGasLimit `json:"excessGas" rlp:"optional"`
 
 	//NOTE: [rollup-geth] per EIP-7706 this field is not actually part of block header
 	//Not having this field as part of header would require even bigger code refactor
 	//thus, for time being I'm leaving this here and I want to double check if BaseFees where omitted deliberately
-	BaseFees *VectorFeeBigint `rlp:"-" json:"-"`
+	BaseFees VectorFeeBigint `rlp:"-" json:"-"`
 }
 
 // field type overrides for gencodec
@@ -361,8 +361,7 @@ func CopyHeader(h *Header) *Header {
 
 	//[rollup-geth] EIP-7706
 	if h.BaseFees != nil {
-		cpy.BaseFees = new(VectorFeeBigint)
-		*cpy.BaseFees = (*h.BaseFees).VectorCopy()
+		cpy.BaseFees = h.BaseFees.VectorCopy()
 	}
 
 	cpy.GasLimits = h.GasLimits
