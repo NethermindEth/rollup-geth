@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip7706"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -219,6 +220,21 @@ func (hc *HeaderChain) WriteHeaders(headers []*types.Header) (int, error) {
 		}
 		number := header.Number.Uint64()
 		newTD.Add(newTD, header.Difficulty)
+
+		//[rollup-geth] EIP-7706
+		if header.BaseFees == nil {
+			var parent *types.Header
+			if i > 0 {
+				parent = headers[i-1]
+			} else {
+				parent = hc.GetHeader(header.ParentHash, header.Number.Uint64()-1)
+			}
+
+			baseFees, err := eip7706.CalcBaseFeesFromParentHeader(hc.config, parent)
+			if err == nil {
+				header.BaseFees = baseFees
+			}
+		}
 
 		// If the parent was not present, store it
 		// If the header is already known, skip it, otherwise store

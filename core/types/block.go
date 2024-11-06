@@ -585,3 +585,16 @@ func HeaderParentHashFromRLP(header []byte) common.Hash {
 	}
 	return common.BytesToHash(parentHash)
 }
+
+func (b *Block) BaseFees() *VectorFeeBigint {
+	if b.header.BaseFees == nil {
+		return nil
+	}
+
+	baseFees := b.header.BaseFees.VectorCopy()
+	return &baseFees
+}
+
+func (b *Block) SetBaseFees(baseFees *VectorFeeBigint) {
+	b.header.BaseFees = baseFees
+}
