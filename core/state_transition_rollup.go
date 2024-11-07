@@ -372,5 +372,5 @@ func (st *StateTransition) vectorGasRemaining() types.VectorGasLimit {
 
 	//NOTE: 2 msg.GasLimits[0] == msg.GasLimit == st.initialGas
 	// this is why this holds
-	return st.msg.GasLimits.VectorSubtract(st.vectorGasUsed())
+	return st.msg.GasLimits.VectorSubtractClampAtZero(st.vectorGasUsed())
 }

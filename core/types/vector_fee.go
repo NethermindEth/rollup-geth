@@ -241,16 +241,6 @@ func (vec VectorGasLimit) VectorAdd(other VectorGasLimit) VectorGasLimit {
 	return result
 }
 
-// VectorSubtract subtracts corresponding elements of other from vec.
-// Note: Does not check for underflow.
-func (vec VectorGasLimit) VectorSubtract(other VectorGasLimit) VectorGasLimit {
-	result := make(VectorGasLimit, VectorFeeTypesCount)
-	for i, v := range vec {
-		result[i] = v - other[i]
-	}
-	return result
-}
-
 // VectorSubtractClampAtZero subtracts corresponding elements of other from vec,
 // clamping results at zero if they would be negative.
 func (vec VectorGasLimit) VectorSubtractClampAtZero(other VectorGasLimit) VectorGasLimit {
