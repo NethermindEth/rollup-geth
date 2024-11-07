@@ -46,7 +46,7 @@ func (tx *VectorFeeTx) gasLimits() VectorGasLimit {
 }
 
 func (tx *VectorFeeTx) gasTipCaps() VectorFeeBigint {
-	var feesAsBigInt VectorFeeBigint
+	feesAsBigInt := make(VectorFeeBigint, len(tx.GasTipCaps))
 	for i, f := range tx.GasTipCaps {
 		feesAsBigInt[i] = f.ToBig()
 	}
@@ -55,7 +55,7 @@ func (tx *VectorFeeTx) gasTipCaps() VectorFeeBigint {
 }
 
 func (tx *VectorFeeTx) gasFeeCaps() VectorFeeBigint {
-	var feesAsBigInt VectorFeeBigint
+	feesAsBigInt := make(VectorFeeBigint, len(tx.GasFeeCaps))
 	for i, f := range tx.GasFeeCaps {
 		feesAsBigInt[i] = f.ToBig()
 	}

@@ -112,7 +112,7 @@ func CalcBaseFeesFromParentHeader(config *params.ChainConfig, parent *types.Head
 
 // CalcBaseFees  calculates vector of the base fees for current block header given parent excess gas and targets
 func CalcBaseFees(parentExecGas, parentGasLimits types.VectorGasLimit) types.VectorFeeBigint {
-	baseFees := types.NewVectorFeeBigInt()
+	baseFees := make(types.VectorFeeBigint, types.VectorFeeTypesCount)
 	targets := getBlockTargets(parentGasLimits)
 
 	for i, execGas := range parentExecGas {
@@ -138,7 +138,7 @@ func CalcExecGas(parentGasUsed, parentExecGas, parentGasLimits types.VectorGasLi
 }
 
 func getBlockTargets(parentGasLimits types.VectorGasLimit) types.VectorGasLimit {
-	var targets types.VectorGasLimit
+	targets := make(types.VectorGasLimit, types.VectorFeeTypesCount)
 	for i, limit := range parentGasLimits {
 		if params.LimitTargetRatios[i] == 0 {
 			targets[i] = 0

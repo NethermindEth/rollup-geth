@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
+
+var OverflowError = errors.New("value overflowed")
 
 func TransactionToMessage(tx *types.Transaction, s types.Signer, h *types.Header, chainConfig *params.ChainConfig) (*Message, error) {
 	if chainConfig.IsEIP7706(h.Number, h.Time) {
@@ -71,20 +74,20 @@ func (st *StateTransition) buyGas() error {
 	return st.buyGasEIP4844()
 }
 
-func (st *StateTransition) refundGasToAddress() {
+func (st *StateTransition) refundGasToAddress() error {
 	if st.evm.ChainConfig().IsEIP7706(st.evm.Context.BlockNumber, st.evm.Context.Time) {
-		st.refundGasToAddressEIP7706()
-	} else {
-		st.refundGasToAddressEIP4844()
+		return st.refundGasToAddressEIP7706()
 	}
+
+	return st.refundGasToAddressEIP4844()
 }
 
-func (st *StateTransition) payTheTip(rules params.Rules, msg *Message) {
+func (st *StateTransition) payTheTip(rules params.Rules, msg *Message) error {
 	if st.evm.ChainConfig().IsEIP7706(st.evm.Context.BlockNumber, st.evm.Context.Time) {
-		st.payTheTipEIP7706(rules, msg)
-	} else {
-		st.payTheTipEIP4844(rules, msg)
+		return st.payTheTipEIP7706(rules, msg)
 	}
+
+	return st.payTheTipEIP4844(rules, msg)
 }
 
 func (st *StateTransition) buyGasEIP4844() error {
@@ -126,7 +129,10 @@ func (st *StateTransition) buyGasEIP4844() error {
 	st.gasRemaining = st.msg.GasLimit
 
 	st.initialGas = st.msg.GasLimit
-	mgvalU256, _ := uint256.FromBig(mgval)
+	mgvalU256, overflowed := uint256.FromBig(mgval)
+	if overflowed {
+		return fmt.Errorf("EIP-4844 %w", OverflowError)
+	}
 	st.state.SubBalance(st.msg.From, mgvalU256, tracing.BalanceDecreaseGasBuy)
 	return nil
 }
@@ -135,23 +141,31 @@ func (st *StateTransition) buyGasEIP7706() error {
 	gasLimits := st.msg.GasLimits.ToVectorBigInt()
 
 	// User should be able to cover GAS_LIMIT * MAX_FEE_PER_GAS + tx.value
-	maxGasFees := gasLimits.VectorMul(st.msg.GasFeeCaps)
-	balanceCheck := maxGasFees.Sum()
+	maxGasFees, err := gasLimits.VectorMul(st.msg.GasFeeCaps)
+	if err != nil {
+		return fmt.Errorf("EIP-7706 failed to calculate max gas fees vector: %w", err)
+	}
+
+	balanceCheck, err := maxGasFees.Sum()
+	if err != nil {
+		return fmt.Errorf("EIP-7706 failed to calculate max gas fees sum: %w", err)
+	}
+
 	balanceCheck.Add(balanceCheck, st.msg.Value)
 	balanceCheckU256, overflow := uint256.FromBig(balanceCheck)
 
 	if overflow {
-		return fmt.Errorf("%w: address %v required balance exceeds 256 bits", ErrInsufficientFunds, st.msg.From.Hex())
+		return fmt.Errorf("EIP-7706: %w: address %v required balance exceeds 256 bits", ErrInsufficientFunds, st.msg.From.Hex())
 	}
 	if have, want := st.state.GetBalance(st.msg.From), balanceCheckU256; have.Cmp(want) < 0 {
-		return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From.Hex(), have, want)
+		return fmt.Errorf("EIP-7706: %w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From.Hex(), have, want)
 	}
 
 	// NOTE: calculations below, which rely on msg.GasLimit, are still valid
 	// This is because per EIP-7706 will still have Gas(Limit) as TX field
 	// Which is in fact gas execution limit, so msg.GasLimits[0] == msg.GasLimit
 	if err := st.gp.SubGas(st.msg.GasLimit); err != nil {
-		return err
+		return fmt.Errorf("EIP-7706 failed to subtract gas: %w", err)
 	}
 
 	if st.evm.Config.Tracer != nil && st.evm.Config.Tracer.OnGasChange != nil {
@@ -162,8 +176,19 @@ func (st *StateTransition) buyGasEIP7706() error {
 	st.initialGas = st.msg.GasLimit
 
 	// GAS_LIMIT * ACTUAL_FEE_PER_GAS
-	totalGasFees := st.msg.EffectiveGasPrices.VectorMul(gasLimits).Sum()
-	totalGasFeesU256, _ := uint256.FromBig(totalGasFees)
+	totalGasFeesVec, err := st.msg.EffectiveGasPrices.VectorMul(gasLimits)
+	if err != nil {
+		return fmt.Errorf("EIP-7706 failed to calculate total gas fees vector: %w", err)
+	}
+
+	totalGasFees, err := totalGasFeesVec.Sum()
+	if err != nil {
+		return fmt.Errorf("EIP-7706 failed to calculate total gas fees sum: %w", err)
+	}
+	totalGasFeesU256, overflowed := uint256.FromBig(totalGasFees)
+	if overflowed {
+		return fmt.Errorf("EIP-7706 %w", OverflowError)
+	}
 
 	st.state.SubBalance(st.msg.From, totalGasFeesU256, tracing.BalanceDecreaseGasBuy)
 	return nil
@@ -217,10 +242,6 @@ func (st *StateTransition) preCheckGasEIP4484() error {
 }
 
 func (st *StateTransition) preCheckGasEIP7706() error {
-	if st.evm.ChainConfig().IsEIP7706(st.evm.Context.BlockNumber, st.evm.Context.Time) {
-		return nil
-	}
-
 	msg := st.msg
 	// Skip the checks if gas fields are zero and baseFee was explicitly disabled (eth_call)
 	skipCheck := st.evm.Config.NoBaseFee && msg.GasFeeCaps.VecBitLenAllZero() && msg.GasTipCaps.VecBitLenAllZero()
@@ -229,47 +250,64 @@ func (st *StateTransition) preCheckGasEIP7706() error {
 	}
 
 	if !msg.GasFeeCaps.VecBitLenAllLessEqThan256() {
-		return fmt.Errorf("%w: address %v", ErrFeeCapVeryHigh, msg.From.Hex())
+		return fmt.Errorf("EIP-7706: %w: address %v", ErrFeeCapVeryHigh, msg.From.Hex())
 	}
 	if !msg.GasTipCaps.VecBitLenAllLessEqThan256() {
-		return fmt.Errorf("%w: address %v", ErrTipVeryHigh, msg.From.Hex())
+		return fmt.Errorf("EIP-7706: %w: address %v", ErrTipVeryHigh, msg.From.Hex())
 	}
 	if !msg.GasTipCaps.VectorAllLessOrEqual(msg.GasFeeCaps) {
-		return fmt.Errorf("%w: address %v", ErrTipAboveFeeCap, msg.From.Hex())
+		return fmt.Errorf("EIP-7706: %w: address %v", ErrTipAboveFeeCap, msg.From.Hex())
 	}
 	if !st.evm.Context.BaseFees.VectorAllLessOrEqual(msg.GasFeeCaps) {
-		return fmt.Errorf("%w: address %v", ErrFeeCapTooLow, msg.From.Hex())
+		return fmt.Errorf("EIP-7706: %w: address %v", ErrFeeCapTooLow, msg.From.Hex())
 	}
 
 	return nil
 }
 
-func (st *StateTransition) refundGasToAddressEIP4844() {
+func (st *StateTransition) refundGasToAddressEIP4844() error {
 	gasFeeToRefund := uint256.NewInt(st.gasRemaining)
 	gasFeeToRefund.Mul(gasFeeToRefund, uint256.MustFromBig(st.msg.GasPrice))
 	st.state.AddBalance(st.msg.From, gasFeeToRefund, tracing.BalanceIncreaseGasReturn)
+
+	return nil
 }
 
-func (st *StateTransition) refundGasToAddressEIP7706() {
+func (st *StateTransition) refundGasToAddressEIP7706() error {
 	gasToRefund := st.vectorGasRemaining().ToVectorBigInt()
-	gasFeeToRefund := gasToRefund.VectorMul(st.msg.EffectiveGasPrices).Sum()
+	gasFeeToRefundVec, err := gasToRefund.VectorMul(st.msg.EffectiveGasPrices)
+	if err != nil {
+		return fmt.Errorf("EIP-7706 failed to calculate gas fees refund vector: %w", err)
+	}
+
+	gasFeeToRefund, err := gasFeeToRefundVec.Sum()
+	if err != nil {
+		return fmt.Errorf("EIP-7706 failed to calculate refund gas fee sum: %w", err)
+	}
 
 	st.state.AddBalance(st.msg.From, uint256.MustFromBig(gasFeeToRefund), tracing.BalanceIncreaseGasReturn)
+
+	return nil
 }
 
-func (st *StateTransition) payTheTipEIP4844(rules params.Rules, msg *Message) {
+func (st *StateTransition) payTheTipEIP4844(rules params.Rules, msg *Message) error {
 	if st.evm.Config.NoBaseFee && msg.GasFeeCap.Sign() == 0 && msg.GasTipCap.Sign() == 0 {
 		// Skip fee payment when NoBaseFee is set and the fee fields
 		// are 0. This avoids a negative effectiveTip being applied to
 		// the coinbase when simulating calls.
-		return
+		return nil
 	}
 
 	effectiveTip := msg.GasPrice
 	if rules.IsLondon {
 		effectiveTip = math.BigMin(msg.GasTipCap, new(big.Int).Sub(msg.GasFeeCap, st.evm.Context.BaseFee))
 	}
-	effectiveTipU256, _ := uint256.FromBig(effectiveTip)
+	effectiveTipU256, didOVerflow := uint256.FromBig(effectiveTip)
+
+	if didOVerflow {
+		return fmt.Errorf("EIP-4844 %w", OverflowError)
+	}
+
 	fee := new(uint256.Int).SetUint64(st.gasUsed())
 	fee.Mul(fee, effectiveTipU256)
 	st.state.AddBalance(st.evm.Context.Coinbase, fee, tracing.BalanceIncreaseRewardTransactionFee)
@@ -278,24 +316,42 @@ func (st *StateTransition) payTheTipEIP4844(rules params.Rules, msg *Message) {
 	if rules.IsEIP4762 && fee.Sign() != 0 {
 		st.evm.AccessEvents.AddAccount(st.evm.Context.Coinbase, true)
 	}
+
+	return nil
 }
 
-func (st *StateTransition) payTheTipEIP7706(rules params.Rules, msg *Message) {
+func (st *StateTransition) payTheTipEIP7706(rules params.Rules, msg *Message) error {
 	if st.evm.Config.NoBaseFee && msg.GasTipCaps.VecBitLenAllZero() && msg.GasFeeCaps.VecBitLenAllZero() {
 		// Skip fee payment when NoBaseFee is set and the fee fields
 		// are 0. This avoids a negative effectiveTip being applied to
 		// the coinbase when simulating calls.
-		return
+		return nil
 	}
 
 	gasUsed := st.vectorGasUsed()
-	totalTip, _ := uint256.FromBig(msg.EffectiveGasTips.VectorMul(gasUsed.ToVectorBigInt()).Sum())
+	gasTipsVec, err := msg.EffectiveGasTips.VectorMul(gasUsed.ToVectorBigInt())
+	if err != nil {
+		return fmt.Errorf("EIP-7706 failed to calculate gas tips vec: %w", err)
+	}
+
+	totalGasTip, err := gasTipsVec.Sum()
+	if err != nil {
+		return fmt.Errorf("EIP-7706 failed to calculate total gas tip: %w", err)
+	}
+
+	totalTip, overflowed := uint256.FromBig(totalGasTip)
+	if overflowed {
+		return fmt.Errorf("EIP-7706 %v", OverflowError)
+	}
+
 	st.state.AddBalance(st.evm.Context.Coinbase, totalTip, tracing.BalanceIncreaseRewardTransactionFee)
 
 	// add the coinbase to the witness iff the fee is greater than 0
 	if rules.IsEIP4762 && totalTip.Sign() != 0 {
 		st.evm.AccessEvents.AddAccount(st.evm.Context.Coinbase, true)
 	}
+
+	return nil
 }
 
 func (st *StateTransition) vectorGasUsed() types.VectorGasLimit {
