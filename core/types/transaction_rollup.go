@@ -19,7 +19,7 @@ func (tx *Transaction) GasFeeCaps() VectorFeeBigint { return tx.inner.gasFeeCaps
 func (tx *Transaction) EffectiveGasTips(baseFees VectorFeeBigint) VectorFeeBigint {
 	gasFeeCaps := tx.GasFeeCaps()
 	gasTipCaps := tx.GasTipCaps()
-	effectiveTips := NewVectorFeeBigInt()
+	effectiveTips := make(VectorFeeBigint, VectorFeeTypesCount)
 	for i, baseFee := range baseFees {
 		if baseFee == nil {
 			effectiveTips[i].Set(gasTipCaps[i])
@@ -35,7 +35,7 @@ func (tx *Transaction) EffectiveGasTips(baseFees VectorFeeBigint) VectorFeeBigin
 func (tx *Transaction) EffectiveGasPrices(baseFees VectorFeeBigint) VectorFeeBigint {
 	gasFeeCaps := tx.GasFeeCaps()
 	gasTipCaps := tx.GasTipCaps()
-	effectiveFees := NewVectorFeeBigInt()
+	effectiveFees := make(VectorFeeBigint, VectorFeeTypesCount)
 
 	for i, baseFee := range baseFees {
 		if baseFee == nil {
@@ -54,5 +54,5 @@ func (tx *Transaction) EffectiveGasPrice(baseFee *big.Int) *big.Int {
 }
 
 func (tx *Transaction) EffectiveGasExecutionPrice(baseFees VectorFeeBigint) *big.Int {
-	return tx.EffectiveGasPrices(baseFees)[0]
+	return tx.EffectiveGasPrices(baseFees)[ExecutionGasIndex]
 }

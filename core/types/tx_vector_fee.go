@@ -46,7 +46,7 @@ func (tx *VectorFeeTx) gasLimits() VectorGasLimit {
 }
 
 func (tx *VectorFeeTx) gasTipCaps() VectorFeeBigint {
-	feesAsBigInt := make(VectorFeeBigint, len(tx.GasTipCaps))
+	feesAsBigInt := make(VectorFeeBigint, VectorFeeTypesCount)
 	for i, f := range tx.GasTipCaps {
 		feesAsBigInt[i] = f.ToBig()
 	}
@@ -55,7 +55,7 @@ func (tx *VectorFeeTx) gasTipCaps() VectorFeeBigint {
 }
 
 func (tx *VectorFeeTx) gasFeeCaps() VectorFeeBigint {
-	feesAsBigInt := make(VectorFeeBigint, len(tx.GasFeeCaps))
+	feesAsBigInt := make(VectorFeeBigint, VectorFeeTypesCount)
 	for i, f := range tx.GasFeeCaps {
 		feesAsBigInt[i] = f.ToBig()
 	}
@@ -112,12 +112,12 @@ func (tx *VectorFeeTx) copy() TxData {
 		Data:  common.CopyBytes(tx.Data),
 		Gas:   tx.Gas,
 		// These are copied below.
+		GasTipCaps: make(VectorFeeUint, len(tx.GasTipCaps)),
+		GasFeeCaps: make(VectorFeeUint, len(tx.GasFeeCaps)),
 		AccessList: make(AccessList, len(tx.AccessList)),
 		BlobHashes: make([]common.Hash, len(tx.BlobHashes)),
 		Value:      new(uint256.Int),
 		ChainID:    new(uint256.Int),
-		GasTipCaps: VectorFeeUint{},
-		GasFeeCaps: VectorFeeUint{},
 		V:          new(uint256.Int),
 		R:          new(uint256.Int),
 		S:          new(uint256.Int),

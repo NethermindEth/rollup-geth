@@ -43,6 +43,7 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 	var (
 		beneficiary common.Address
 		baseFee     *big.Int
+		baseFees    types.VectorFeeBigint
 		blobBaseFee *big.Int
 		random      *common.Hash
 	)
@@ -63,7 +64,6 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 		random = &header.MixDigest
 	}
 
-	baseFees := types.NewVectorFeeBigInt()
 	if header.BaseFees != nil {
 		baseFees = header.BaseFees.VectorCopy()
 	}

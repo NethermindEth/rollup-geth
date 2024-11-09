@@ -32,15 +32,6 @@ const (
 // ElementNilError is returned when a vector contains nil element(s)
 var ElementNilError = errors.New("Vector contains nil element(s)")
 
-// NewVectorFeeBigInt creates a new VectorFeeBigint with all elements initialized to 0
-func NewVectorFeeBigInt() VectorFeeBigint {
-	result := make(VectorFeeBigint, VectorFeeTypesCount)
-	for i := range result {
-		result[i] = new(big.Int)
-	}
-	return result
-}
-
 // VectorCopy creates a deep copy of the VectorFeeBigint, nils are copied as nils
 func (vec VectorFeeBigint) VectorCopy() VectorFeeBigint {
 	result := make(VectorFeeBigint, VectorFeeTypesCount)

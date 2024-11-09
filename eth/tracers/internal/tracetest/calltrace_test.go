@@ -276,7 +276,7 @@ func TestInternals(t *testing.T) {
 			Difficulty:  big.NewInt(0x30000),
 			GasLimit:    uint64(6000000),
 			BaseFee:     new(big.Int),
-			BaseFees:    types.NewVectorFeeBigInt(),
+			BaseFees:    make(types.VectorFeeBigint, types.VectorFeeTypesCount),
 		}
 	)
 	mkTracer := func(name string, cfg json.RawMessage) *tracers.Tracer {
