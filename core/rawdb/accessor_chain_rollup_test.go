@@ -15,7 +15,7 @@ func TestHeaderStorageIncludingBaseFees(t *testing.T) {
 
 	// Create a test header to move around the database and make sure it's really new
 	baseFees := types.VectorFeeBigint{big.NewInt(1), big.NewInt(2), big.NewInt(3)}
-	header := &types.Header{Number: big.NewInt(42), Extra: []byte("test header base fees"), BaseFees: &baseFees}
+	header := &types.Header{Number: big.NewInt(42), Extra: []byte("test header base fees"), BaseFees: baseFees}
 	if entry := ReadHeader(db, header.Hash(), header.Number.Uint64()); entry != nil {
 		t.Fatalf("Non existent header returned: %v", entry)
 	}

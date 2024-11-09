@@ -9,22 +9,23 @@ import (
 )
 
 // ReadHeaderBaseFees reads the base fees for the given header (hash)
-func ReadHeaderBaseFees(db ethdb.KeyValueReader, hash common.Hash) *types.VectorFeeBigint {
+func ReadHeaderBaseFees(db ethdb.KeyValueReader, hash common.Hash) types.VectorFeeBigint {
 	data, _ := db.Get(headerBaseFeesKey(hash))
 	if len(data) == 0 {
 		return nil
 	}
+
 	dec := new(types.VectorFeeBigint)
 	err := rlp.DecodeBytes(data, dec)
 	if err != nil {
 		return nil
 	}
 
-	return dec
+	return *dec
 }
 
 // WriteHeaderBaseFee stores the header hash->base fees mapping.
-func WriteHeaderBaseFees(db ethdb.KeyValueWriter, hash common.Hash, baseFees *types.VectorFeeBigint) {
+func WriteHeaderBaseFees(db ethdb.KeyValueWriter, hash common.Hash, baseFees types.VectorFeeBigint) {
 	if baseFees == nil {
 		//Pre-EIP-7706 blocks don't have base fees so no need to log errors
 		return

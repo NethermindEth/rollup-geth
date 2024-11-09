@@ -115,7 +115,7 @@ type Header struct {
 	//BaseFees field is actually not part of EIP-7706 protocol, but
 	//since it requires parent to calculate, geth precalculates this field  and stores it in local blockchain
 	//this is to reduce codebase complexity as well as DB read/write operations
-	BaseFees *VectorFeeBigint `rlp:"-" json:"-"`
+	BaseFees VectorFeeBigint `rlp:"-" json:"-"`
 }
 
 // field type overrides for gencodec
@@ -595,6 +595,6 @@ func (b *Block) BaseFees() *VectorFeeBigint {
 	return &baseFees
 }
 
-func (b *Block) SetBaseFees(baseFees *VectorFeeBigint) {
+func (b *Block) SetBaseFees(baseFees VectorFeeBigint) {
 	b.header.BaseFees = baseFees
 }
