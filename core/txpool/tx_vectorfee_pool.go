@@ -163,10 +163,10 @@ func (pool *VectorFeePoolDummy) Add(txs []*types.Transaction, local bool, sync b
 	pool.lock.Lock()
 	defer pool.lock.Unlock()
 
-	var errors []error
+	errors := make([]error, len(txs))
 	adds := make(types.Transactions, 0, len(txs))
 
-	for _, tx := range txs {
+	for i, tx := range txs {
 		h := tx.Hash()
 		if _, alreadyInThePool := pool.txs[h]; alreadyInThePool {
 			continue
@@ -174,7 +174,7 @@ func (pool *VectorFeePoolDummy) Add(txs []*types.Transaction, local bool, sync b
 
 		from, err := types.Sender(pool.signer, tx)
 		if err != nil {
-			errors = append(errors, err)
+			errors[i] = err
 			continue
 		}
 
@@ -182,6 +182,7 @@ func (pool *VectorFeePoolDummy) Add(txs []*types.Transaction, local bool, sync b
 		pool.txsByAddress[from] = append(pool.txsByAddress[from], tx)
 
 		adds = append(adds, tx)
+		log.Trace("Pooled new future transaction", "hash", tx.Hash(), "from", from, "to", tx.To())
 	}
 
 	if len(adds) > 0 {

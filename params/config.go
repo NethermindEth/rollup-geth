@@ -160,6 +160,9 @@ var (
 		CancunTime:                    newUint64(0),
 		TerminalTotalDifficulty:       big.NewInt(0),
 		TerminalTotalDifficultyPassed: true,
+
+		//[roolup-geth] EIP-7706
+		EIP7706Time: newUint64(0),
 	}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced

@@ -79,7 +79,10 @@ type ExecutableData struct {
 	Deposits         types.Deposits          `json:"depositRequests"`
 	ExecutionWitness *types.ExecutionWitness `json:"executionWitness,omitempty"`
 
-	//TODO:: [rollup-geth] Add EIP-7706 specific fields
+	//[rollup-geth] Add EIP-7706 specific fields
+	GasLimits     types.VectorGasLimit `json:"gasLimits"`
+	GasUsedVector types.VectorGasLimit `json:"gasUsedVector"`
+	ExcessGas     types.VectorGasLimit `json:"excessGas"`
 }
 
 // JSON type overrides for executableData.
@@ -221,7 +224,6 @@ func ExecutableDataToBlock(data ExecutableData, versionedHashes []common.Hash, b
 	return block, nil
 }
 
-// TODO: [rollup-geth] Add EIP-7706 fields
 // ExecutableDataToBlockNoHash is analogous to ExecutableDataToBlock, but is used
 // for stateless execution, so it skips checking if the executable data hashes to
 // the requested hash (stateless has to *compute* the root hash, it's not given).
@@ -294,6 +296,11 @@ func ExecutableDataToBlockNoHash(data ExecutableData, versionedHashes []common.H
 		BlobGasUsed:      data.BlobGasUsed,
 		ParentBeaconRoot: beaconRoot,
 		RequestsHash:     requestsHash,
+
+		//[rollup-geth] EIP-7706 fields
+		GasLimits:     data.GasLimits,
+		GasUsedVector: data.GasUsedVector,
+		ExcessGas:     data.ExcessGas,
 	}
 	return types.NewBlockWithHeader(header).
 			WithBody(types.Body{Transactions: txs, Uncles: nil, Withdrawals: data.Withdrawals, Requests: requests}).
@@ -324,6 +331,11 @@ func BlockToExecutableData(block *types.Block, fees *big.Int, sidecars []*types.
 		BlobGasUsed:      block.BlobGasUsed(),
 		ExcessBlobGas:    block.ExcessBlobGas(),
 		ExecutionWitness: block.ExecutionWitness(),
+
+		//[rollup-geth] EIP-7706 fields
+		GasLimits:     block.Header().GasLimits,
+		GasUsedVector: block.Header().GasUsedVector,
+		ExcessGas:     block.Header().ExcessGas,
 	}
 	bundle := BlobsBundleV1{
 		Commitments: make([]hexutil.Bytes, 0),

@@ -51,20 +51,12 @@ func (miner *Miner) commitVectorFeeTransactions(env *environment, txsByAddress m
 			continue
 		}
 
-		// Error may be ignored here. The error has already been checked
-		// during transaction acceptance in the transaction pool.
-		from, _ := types.Sender(env.signer, tx)
-
 		// Start executing the transaction
 		env.state.SetTxContext(tx.Hash(), env.tcount)
 
 		err := miner.commitTransaction(env, tx)
-		switch {
-		case errors.Is(err, core.ErrNonceTooLow):
-			// New head notification data race between the transaction pool and miner, shift
-			log.Trace("Skipping transaction with low nonce", "hash", tx.Hash, "sender", from, "nonce", tx.Nonce())
-		default:
-			log.Debug("Transaction failed, account skipped", "hash", tx.Hash, "err", err)
+		if err != nil {
+			log.Error("[EIP-7706] Transaction failed, account skipped", "hash", tx.Hash, "err", err)
 		}
 	}
 
