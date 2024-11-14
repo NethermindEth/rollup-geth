@@ -426,7 +426,6 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 		MinTip: uint256.MustFromBig(tip),
 	}
 
-	//TODO: [rollup-geth] this is used for fetching TXs from the pool, we don't have yet defined rules for multi-dimensional fee ordering
 	if env.header.BaseFee != nil {
 		filter.BaseFee = uint256.MustFromBig(env.header.BaseFee)
 	}
@@ -470,6 +469,14 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 			return err
 		}
 	}
+
+	//[rollup-geth] EIP-7706
+	filter.OnlyVectorFeeTxs, filter.OnlyPlainTxs, filter.OnlyBlobTxs = true, false, false
+	pendingVectorTxs := miner.txpool.Pending(filter)
+	if err := miner.commitVectorFeeTransactions(env, pendingVectorTxs, interrupt); err != nil {
+		return err
+	}
+
 	return nil
 }
 
