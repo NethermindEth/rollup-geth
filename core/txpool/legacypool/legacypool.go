@@ -529,6 +529,12 @@ func (pool *LegacyPool) Pending(filter txpool.PendingFilter) map[common.Address]
 	if filter.OnlyBlobTxs {
 		return nil
 	}
+
+	//[rollup-geth] EIP-7706
+	if filter.OnlyVectorFeeTxs {
+		return nil
+	}
+
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 

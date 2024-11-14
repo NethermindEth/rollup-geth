@@ -198,6 +198,10 @@ func (pool *VectorFeePoolDummy) Add(txs []*types.Transaction, local bool, sync b
 // The transactions can also be pre-filtered by the dynamic fee components to
 // reduce allocations and load on downstream subsystems.
 func (pool *VectorFeePoolDummy) Pending(filter PendingFilter) map[common.Address][]*LazyTransaction {
+	if filter.OnlyBlobTxs || filter.OnlyPlainTxs {
+		return nil
+	}
+
 	pool.lock.RLock()
 	defer pool.lock.RUnlock()
 

@@ -1458,6 +1458,12 @@ func (p *BlobPool) Pending(filter txpool.PendingFilter) map[common.Address][]*tx
 	if filter.OnlyPlainTxs {
 		return nil
 	}
+
+	//[rollup-geth] EIP-7706
+	if filter.OnlyVectorFeeTxs {
+		return nil
+	}
+
 	// Track the amount of time waiting to retrieve the list of pending blob txs
 	// from the pool and the amount of time actually spent on assembling the data.
 	// The latter will be pretty much moot, but we've kept it to have symmetric

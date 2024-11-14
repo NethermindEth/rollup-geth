@@ -83,6 +83,9 @@ type PendingFilter struct {
 
 	OnlyPlainTxs bool // Return only plain EVM transactions (peer-join announces, block space filling)
 	OnlyBlobTxs  bool // Return only blob transactions (block blob-space filling)
+
+	//[rollup-geth] EIP-7706
+	OnlyVectorFeeTxs bool //Return only multi-dim fee transactions introduced by EIP-7706
 }
 
 // SubPool represents a specialized transaction pool that lives on its own (e.g.
