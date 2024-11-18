@@ -1078,6 +1078,7 @@ type Rules struct {
 	IsOptimismBedrock, IsOptimismRegolith                   bool
 	IsOptimismCanyon, IsOptimismFjord                       bool
 	IsOptimismGranite, IsOptimismHolocene                   bool
+	IsR0                                                    bool // [rollup-geth]
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1115,5 +1116,7 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsOptimismFjord:    isMerge && c.IsOptimismFjord(timestamp),
 		IsOptimismGranite:  isMerge && c.IsOptimismGranite(timestamp),
 		IsOptimismHolocene: isMerge && c.IsOptimismHolocene(timestamp),
+
+		IsR0:             true, // [rollup-geth]
 	}
 }
