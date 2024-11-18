@@ -561,7 +561,7 @@ func TestOpenDrops(t *testing.T) {
 	chain := &testBlockChain{
 		config:  params.MainnetChainConfig,
 		basefee: uint256.NewInt(params.InitialBaseFee),
-		blobfee: uint256.NewInt(params.BlobTxMinBlobGasprice),
+		blobfee: uint256.NewInt(params.TxMinGasPrice),
 		statedb: statedb,
 	}
 	pool := New(Config{Datadir: storage}, chain)
@@ -680,7 +680,7 @@ func TestOpenIndex(t *testing.T) {
 	chain := &testBlockChain{
 		config:  params.MainnetChainConfig,
 		basefee: uint256.NewInt(params.InitialBaseFee),
-		blobfee: uint256.NewInt(params.BlobTxMinBlobGasprice),
+		blobfee: uint256.NewInt(params.TxMinGasPrice),
 		statedb: statedb,
 	}
 	pool := New(Config{Datadir: storage}, chain)
@@ -1244,7 +1244,7 @@ func TestAdd(t *testing.T) {
 				},
 				{ // Same as above but blob fee cap equals minimum, should be accepted
 					from: "alice",
-					tx:   makeUnsignedTx(0, 1, 1, params.BlobTxMinBlobGasprice),
+					tx:   makeUnsignedTx(0, 1, 1, params.TxMinGasPrice),
 					err:  nil,
 				},
 			},

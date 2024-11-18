@@ -140,6 +140,7 @@ func (s *supply) OnBlockStart(ev tracing.BlockEvent) {
 	s.delta.ParentHash = ev.Block.ParentHash()
 
 	// Calculate Burn for this block
+	//TODO: [rollup-geth] EIP-7706
 	if ev.Block.BaseFee() != nil {
 		burn := new(big.Int).Mul(new(big.Int).SetUint64(ev.Block.GasUsed()), ev.Block.BaseFee())
 		s.delta.Burn.EIP1559 = burn

@@ -372,6 +372,9 @@ func ReadHeader(db ethdb.Reader, hash common.Hash, number uint64) *types.Header 
 		log.Error("Invalid block header RLP", "hash", hash, "err", err)
 		return nil
 	}
+
+	header.BaseFees = ReadHeaderBaseFees(db, hash)
+
 	return header
 }
 
@@ -384,6 +387,7 @@ func WriteHeader(db ethdb.KeyValueWriter, header *types.Header) {
 	)
 	// Write the hash -> number mapping
 	WriteHeaderNumber(db, hash, number)
+	WriteHeaderBaseFees(db, hash, header.BaseFees)
 
 	// Write the encoded header
 	data, err := rlp.EncodeToBytes(header)
@@ -402,6 +406,7 @@ func DeleteHeader(db ethdb.KeyValueWriter, hash common.Hash, number uint64) {
 	if err := db.Delete(headerNumberKey(hash)); err != nil {
 		log.Crit("Failed to delete hash to number mapping", "err", err)
 	}
+	DeleteHeaderBaseFees(db, hash)
 }
 
 // deleteHeaderWithoutNumber removes only the block header but does not remove

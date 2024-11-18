@@ -268,7 +268,10 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	}
 	legacyPool := legacypool.New(config.TxPool, eth.blockchain)
 
-	txPools := []txpool.SubPool{legacyPool}
+	//[rollup-geth] EIP-7706
+	vectorFeeTxPool := txpool.NewVectorFeePoolDummy(eth.blockchain)
+
+	txPools := []txpool.SubPool{legacyPool, vectorFeeTxPool}
 	if !eth.BlockChain().Config().IsOptimism() {
 		blobPool := blobpool.New(config.BlobPool, eth.blockchain)
 		txPools = append(txPools, blobPool)

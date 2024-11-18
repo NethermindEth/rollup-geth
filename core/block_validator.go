@@ -183,3 +183,9 @@ func CalcGasLimit(parentGasLimit, desiredLimit uint64) uint64 {
 	}
 	return limit
 }
+
+// CalcGasLimits computes gas limits of the next block after parent  per EIP-7706
+func CalcGasLimits(parentGasLimit, desiredLimit uint64) types.VectorGasLimit {
+	executionGasLimit := CalcGasLimit(parentGasLimit, desiredLimit)
+	return types.VectorGasLimit{executionGasLimit, params.MaxBlobGasPerBlock, executionGasLimit / params.CallDataGasLimitRatio}
+}

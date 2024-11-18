@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip7706"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/stateless"
@@ -292,6 +293,15 @@ func (miner *Miner) prepareWork(genParams *generateParams, witness bool) (*envir
 		header.ExcessBlobGas = &excessBlobGas
 		header.ParentBeaconRoot = genParams.beaconRoot
 	}
+
+	if miner.chainConfig.IsEIP7706(header.Number, header.Time) {
+		parentGasUsed, parentExcessGas, parentGasLimits := eip7706.SanitizeEIP7706Fields(parent)
+
+		header.ExcessGas = eip7706.CalcExecGas(parentGasUsed, parentExcessGas, parentGasLimits)
+		header.GasLimits = core.CalcGasLimits(parent.GasLimit, miner.config.GasCeil)
+		header.BaseFees = eip7706.CalcBaseFees(parentExcessGas, parentGasLimits)
+	}
+
 	// Could potentially happen if starting to mine in an odd state.
 	// Note genParams.coinbase can be different with header.Coinbase
 	// since clique algorithm can modify the coinbase field in header.
@@ -440,6 +450,10 @@ func (miner *Miner) applyTransaction(env *environment, tx *types.Transaction) (*
 		env.state.RevertToSnapshot(snap)
 		env.gasPool.SetGas(gp)
 	}
+
+	//[rollup-geth] EIP-7706
+	env.header.GasUsedVector = receipt.GasUsedVector
+
 	return receipt, err
 }
 
@@ -621,6 +635,7 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 		MinTip:      uint256.MustFromBig(tip),
 		MaxDATxSize: miner.config.MaxDATxSize,
 	}
+
 	if env.header.BaseFee != nil {
 		filter.BaseFee = uint256.MustFromBig(env.header.BaseFee)
 	}
@@ -664,6 +679,14 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 			return err
 		}
 	}
+
+	//[rollup-geth] EIP-7706
+	filter.OnlyVectorFeeTxs, filter.OnlyPlainTxs, filter.OnlyBlobTxs = true, false, false
+	pendingVectorTxs := miner.txpool.Pending(filter)
+	if err := miner.commitVectorFeeTransactions(env, pendingVectorTxs, interrupt); err != nil {
+		return err
+	}
+
 	return nil
 }
 

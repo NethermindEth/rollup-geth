@@ -22,6 +22,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -168,11 +169,9 @@ func (tx *BlobTx) effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
 	if baseFee == nil {
 		return dst.Set(tx.GasFeeCap.ToBig())
 	}
-	tip := dst.Sub(tx.GasFeeCap.ToBig(), baseFee)
-	if tip.Cmp(tx.GasTipCap.ToBig()) > 0 {
-		tip.Set(tx.GasTipCap.ToBig())
-	}
-	return tip.Add(tip, baseFee)
+
+	//[rollup-geth]
+	return dst.Set(math.BigMin(dst.Add(tx.GasTipCap.ToBig(), baseFee), tx.GasFeeCap.ToBig()))
 }
 
 func (tx *BlobTx) rawSignatureValues() (v, r, s *big.Int) {

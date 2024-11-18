@@ -127,7 +127,10 @@ func testCallTracer(tracerName string, dirPath string, t *testing.T) {
 				t.Fatalf("failed to create call tracer: %v", err)
 			}
 			state.StateDB.SetLogger(tracer.Hooks)
-			msg, err := core.TransactionToMessage(tx, signer, context.BaseFee)
+
+			//[rollup-geth] EIP-7706
+			msg, err := core.TransactionToMessageEIP4844(tx, signer, context.BaseFee)
+
 			if err != nil {
 				t.Fatalf("failed to prepare transaction for tracing: %v", err)
 			}
@@ -219,7 +222,17 @@ func benchTracer(tracerName string, test *callTracerTest, b *testing.B) {
 		Difficulty:  (*big.Int)(test.Context.Difficulty),
 		GasLimit:    uint64(test.Context.GasLimit),
 	}
-	msg, err := core.TransactionToMessage(tx, signer, context.BaseFee)
+
+	//[rollup-geth] EIP-7706
+	var (
+		msg *core.Message
+		err error
+	)
+	if test.Genesis.Config.IsEIP7706(context.BlockNumber, context.Time) {
+		msg, err = core.TransactionToMessageEIP7706(tx, signer, context.BaseFees)
+	} else {
+		msg, err = core.TransactionToMessageEIP4844(tx, signer, context.BaseFee)
+	}
 	if err != nil {
 		b.Fatalf("failed to prepare transaction for tracing: %v", err)
 	}
@@ -263,6 +276,7 @@ func TestInternals(t *testing.T) {
 			Difficulty:  big.NewInt(0x30000),
 			GasLimit:    uint64(6000000),
 			BaseFee:     new(big.Int),
+			BaseFees:    make(types.VectorFeeBigint, types.VectorFeeTypesCount),
 		}
 	)
 	mkTracer := func(name string, cfg json.RawMessage) *tracers.Tracer {
@@ -376,7 +390,14 @@ func TestInternals(t *testing.T) {
 				GasPrice: tx.GasPrice(),
 			}
 			evm := vm.NewEVM(context, txContext, state.StateDB, config, vm.Config{Tracer: tc.tracer.Hooks})
-			msg, err := core.TransactionToMessage(tx, signer, big.NewInt(0))
+
+			//[rollup-geth] EIP-7706
+			var msg *core.Message
+			if config.IsEIP7706(context.BlockNumber, context.Time) {
+				msg, err = core.TransactionToMessageEIP7706(tx, signer, context.BaseFees)
+			} else {
+				msg, err = core.TransactionToMessageEIP4844(tx, signer, context.BaseFee)
+			}
 			if err != nil {
 				t.Fatalf("test %v: failed to create message: %v", tc.name, err)
 			}

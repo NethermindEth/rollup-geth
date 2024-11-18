@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip7706"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -306,6 +307,25 @@ func (beacon *Beacon) verifyHeader(chain consensus.ChainHeaderReader, header, pa
 			return err
 		}
 	}
+
+	if chain.Config().IsEIP7706(header.Number, header.Time) {
+		if err := eip7706.VerifyEIP7706Header(parent, header); err != nil {
+			return err
+		}
+	} else {
+		// make sure that EIP-7706 specific fields are not present on non EIP-7706 blocks
+		switch {
+		case header.ExcessGas != nil:
+			return fmt.Errorf("invalid excessGas: have %v, expected nil", header.ExcessGas)
+		case header.GasUsedVector != nil:
+			return fmt.Errorf("invalid gasUsedVector: have %v, expected nil", header.GasUsedVector)
+		case header.GasLimits != nil:
+			return fmt.Errorf("invalid gasLimits: have %v, expected nil", header.GasLimits)
+		case header.BaseFees != nil:
+			return fmt.Errorf("invalid baseFees: have %v, expected nil", header.BaseFees)
+		}
+	}
+
 	return nil
 }
 

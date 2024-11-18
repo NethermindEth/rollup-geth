@@ -94,7 +94,8 @@ func flatCallTracerTestRunner(tracerName string, filename string, dirPath string
 	}
 
 	state.StateDB.SetLogger(tracer.Hooks)
-	msg, err := core.TransactionToMessage(tx, signer, context.BaseFee)
+	//[rollup-geth] EIP-7706
+	msg, err := core.TransactionToMessageEIP4844(tx, signer, context.BaseFee)
 	if err != nil {
 		return fmt.Errorf("failed to prepare transaction for tracing: %v", err)
 	}

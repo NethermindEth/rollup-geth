@@ -285,6 +285,9 @@ func applyCancunChecks(env *stEnv, chainConfig *params.ChainConfig) error {
 	return nil
 }
 
+// TODO: [rollup-geth] implement this
+func applyEIP7706Checks(env *stEnv, chainConfig *params.ChainConfig) error { return nil }
+
 type Alloc map[common.Address]types.Account
 
 func (g Alloc) OnRoot(common.Hash) {}

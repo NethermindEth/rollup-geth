@@ -151,6 +151,7 @@ func (sim *simulator) processBlock(ctx context.Context, block *simBlock, header,
 		// In non-validation mode base fee is set to 0 if it is not overridden.
 		// This is because it creates an edge case in EVM where gasPrice < baseFee.
 		// Base fee could have been overridden.
+		//TODO:[rollup-geth] what about EIP-7706 base fees?
 		if header.BaseFee == nil {
 			if sim.validate {
 				header.BaseFee = eip1559.CalcBaseFee(sim.chainConfig, parent, header.Time)

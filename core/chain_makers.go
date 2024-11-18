@@ -229,6 +229,7 @@ func (b *BlockGen) AddUncle(h *types.Header) {
 	h.Difficulty = b.engine.CalcDifficulty(b.cm, b.header.Time, parent)
 
 	// The gas limit and price should be derived from the parent
+	//TODO: [rollup-geth] add EIP-7706 base fees and gas limits calculation
 	h.GasLimit = parent.GasLimit
 	if b.cm.config.IsLondon(h.Number) {
 		h.BaseFee = eip1559.CalcBaseFee(b.cm.config, parent, h.Time)
@@ -401,6 +402,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		if block.ExcessBlobGas() != nil {
 			blobGasPrice = eip4844.CalcBlobFee(*block.ExcessBlobGas())
 		}
+		//TODO: [rollup-geth] what about VectorBaseFees/VectorGasPrices
 		if err := receipts.DeriveFields(config, block.Hash(), block.NumberU64(), block.Time(), block.BaseFee(), blobGasPrice, txs); err != nil {
 			panic(err)
 		}
@@ -507,6 +509,8 @@ func GenerateVerkleChain(config *params.ChainConfig, parent *types.Block, engine
 		if block.ExcessBlobGas() != nil {
 			blobGasPrice = eip4844.CalcBlobFee(*block.ExcessBlobGas())
 		}
+
+		//TODO: [rollup-geth] what about VectorBaseFees/VectorGasPrices
 		if err := receipts.DeriveFields(config, block.Hash(), block.NumberU64(), block.Time(), block.BaseFee(), blobGasPrice, txs); err != nil {
 			panic(err)
 		}
@@ -547,6 +551,7 @@ func (cm *chainMaker) makeHeader(parent *types.Block, state *state.StateDB, engi
 		Time:       time,
 	}
 
+	//TODO: [rollup-geth] add EIP-7706 base fees and gas limits calculation
 	if cm.config.IsLondon(header.Number) {
 		header.BaseFee = eip1559.CalcBaseFee(cm.config, parent.Header(), header.Time)
 		if !cm.config.IsLondon(parent.Number()) {
@@ -568,6 +573,9 @@ func (cm *chainMaker) makeHeader(parent *types.Block, state *state.StateDB, engi
 		header.BlobGasUsed = new(uint64)
 		header.ParentBeaconRoot = new(common.Hash)
 	}
+
+	//TODO: [rollup-geth] for testing purposes add generating EIP-7706 block headers
+
 	return header
 }
 

@@ -773,6 +773,7 @@ func (b *Block) NextBaseFeePerGas(ctx context.Context) (*hexutil.Big, error) {
 			return nil, nil
 		}
 	}
+	//TODO:[rollup-geth] what about EIP-7706 base fees?
 	nextBaseFee := eip1559.CalcBaseFee(chaincfg, header, header.Time+1)
 	return (*hexutil.Big)(nextBaseFee), nil
 }

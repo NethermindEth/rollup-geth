@@ -89,6 +89,9 @@ type PendingFilter struct {
 	// OP stack addition: Maximum l1 data size allowed for an included transaction (for throttling
 	// when batcher is backlogged). Ignored if nil.
 	MaxDATxSize *big.Int
+
+	//[rollup-geth] EIP-7706
+	OnlyVectorFeeTxs bool //Return only multi-dim fee transactions introduced by EIP-7706
 }
 
 // SubPool represents a specialized transaction pool that lives on its own (e.g.

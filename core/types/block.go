@@ -105,9 +105,21 @@ type Header struct {
 
 	// RequestsHash was added by EIP-7685 and is ignored in legacy headers.
 	RequestsHash *common.Hash `json:"requestsRoot" rlp:"optional"`
+
+	//[rollup-geth] EIP-7706 required fields
+	GasLimits     VectorGasLimit `json:"gasLimits" rlp:"optional"`
+	GasUsedVector VectorGasLimit `json:"gasUsedVector" rlp:"optional"`
+	ExcessGas     VectorGasLimit `json:"excessGas" rlp:"optional"`
+
+	//[rollup-geth] EIP-7706
+	//BaseFees field is actually not part of EIP-7706 protocol, but
+	//since it requires parent to calculate, geth precalculates this field  and stores it in local blockchain
+	//this is to reduce codebase complexity as well as DB read/write operations
+	BaseFees VectorFeeBigint `rlp:"-" json:"-"`
 }
 
 // field type overrides for gencodec
+// TODO: [rollup-geth] add EIP-7706 fields here
 type headerMarshaling struct {
 	Difficulty    *hexutil.Big
 	Number        *hexutil.Big
@@ -129,6 +141,8 @@ func (h *Header) Hash() common.Hash {
 
 var headerSize = common.StorageSize(reflect.TypeOf(Header{}).Size())
 
+// TODO:[rollup-geth] what about EIP-7706 specific fields
+// Additionally why weren't EIP-4844 fields added to the size calculation?
 // Size returns the approximate memory used by all internal contents. It is used
 // to approximate and limit the memory consumption of various caches.
 func (h *Header) Size() common.StorageSize {
@@ -160,6 +174,7 @@ func (h *Header) SanityCheck() error {
 			return fmt.Errorf("too large base fee: bitlen %d", bfLen)
 		}
 	}
+
 	return nil
 }
 
@@ -193,6 +208,14 @@ func (h *Header) CheckTransactionConditional(cond *TransactionConditional) error
 		return fmt.Errorf("failed timestamp maximum constraint")
 	}
 	return nil
+}
+
+// TODO: [rollup-geth] Do we need BaseFees() as well?
+func (h *Header) GetBaseFee() *big.Int {
+	if h.BaseFee == nil {
+		return nil
+	}
+	return new(big.Int).Set(h.BaseFee)
 }
 
 // Body is a simple (mutable, non-safe) data container for storing and moving
@@ -355,6 +378,16 @@ func CopyHeader(h *Header) *Header {
 		cpy.RequestsHash = new(common.Hash)
 		*cpy.RequestsHash = *h.RequestsHash
 	}
+
+	//[rollup-geth] EIP-7706
+	if h.BaseFees != nil {
+		cpy.BaseFees = h.BaseFees.VectorCopy()
+	}
+
+	cpy.GasLimits = h.GasLimits
+	cpy.ExcessGas = h.ExcessGas
+	cpy.GasUsedVector = h.GasUsedVector
+
 	return &cpy
 }
 
@@ -429,6 +462,7 @@ func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
 func (b *Block) UncleHash() common.Hash   { return b.header.UncleHash }
 func (b *Block) Extra() []byte            { return common.CopyBytes(b.header.Extra) }
 
+// TODO: [rollup-geth] Do we need BaseFees() as well?
 func (b *Block) BaseFee() *big.Int {
 	if b.header.BaseFee == nil {
 		return nil
@@ -567,4 +601,17 @@ func HeaderParentHashFromRLP(header []byte) common.Hash {
 		return common.Hash{}
 	}
 	return common.BytesToHash(parentHash)
+}
+
+func (b *Block) BaseFees() *VectorFeeBigint {
+	if b.header.BaseFees == nil {
+		return nil
+	}
+
+	baseFees := b.header.BaseFees.VectorCopy()
+	return &baseFees
+}
+
+func (b *Block) SetBaseFees(baseFees VectorFeeBigint) {
+	b.header.BaseFees = baseFees
 }

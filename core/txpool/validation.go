@@ -39,7 +39,7 @@ const l1InfoGasOverhead = uint64(70_000)
 var (
 	// blobTxMinBlobGasPrice is the big.Int version of the configured protocol
 	// parameter to avoid constructing a new big integer for every transaction.
-	blobTxMinBlobGasPrice = big.NewInt(params.BlobTxMinBlobGasprice)
+	blobTxMinBlobGasPrice = big.NewInt(params.TxMinGasPrice)
 )
 
 func EffectiveGasLimit(chainConfig *params.ChainConfig, gasLimit uint64, effectiveLimit uint64) uint64 {

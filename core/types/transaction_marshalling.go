@@ -63,6 +63,8 @@ type txJSON struct {
 
 	// Only used for encoding:
 	Hash common.Hash `json:"hash"`
+
+	//TODO: add marshaling vector_fee_tx fields
 }
 
 // yParityValue returns the YParity value from JSON. For backwards-compatibility reasons,

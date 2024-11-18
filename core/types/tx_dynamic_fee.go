@@ -21,6 +21,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -102,11 +103,9 @@ func (tx *DynamicFeeTx) effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.I
 	if baseFee == nil {
 		return dst.Set(tx.GasFeeCap)
 	}
-	tip := dst.Sub(tx.GasFeeCap, baseFee)
-	if tip.Cmp(tx.GasTipCap) > 0 {
-		tip.Set(tx.GasTipCap)
-	}
-	return tip.Add(tip, baseFee)
+
+	//[rollup-geth]
+	return dst.Set(math.BigMin(dst.Add(tx.GasTipCap, baseFee), tx.GasFeeCap))
 }
 
 func (tx *DynamicFeeTx) rawSignatureValues() (v, r, s *big.Int) {

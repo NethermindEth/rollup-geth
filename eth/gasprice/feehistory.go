@@ -90,6 +90,7 @@ func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
 	if bf.results.baseFee = bf.header.BaseFee; bf.results.baseFee == nil {
 		bf.results.baseFee = new(big.Int)
 	}
+	//TODO:[rollup-geth] what about EIP-7706 base fees?
 	if config.IsLondon(big.NewInt(int64(bf.blockNumber + 1))) {
 		bf.results.nextBaseFee = eip1559.CalcBaseFee(config, bf.header, bf.header.Time+1)
 	} else {
