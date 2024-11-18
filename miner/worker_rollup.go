@@ -1,7 +1,6 @@
 package miner
 
 import (
-	"errors"
 	"slices"
 	"sync/atomic"
 
