@@ -359,6 +359,16 @@ func (st *StateTransition) vectorGasUsed() types.VectorGasLimit {
 	// NOTE: Gas used by [execution, blob, calldata]
 	// Blob and calldata gas used is actually same as their gas limits (because it is precomputed from tx data and known upfront)
 	// Only execution gas is not known upfront and has to be determined while executing the transaction
+
+	// If message was not created using TransactionToMessage() call this can be nil
+	if st.msg.GasLimits == nil {
+		return nil
+	}
+
+	if !st.evm.ChainConfig().IsEIP7706(st.evm.Context.BlockNumber, st.evm.Context.Time) {
+		return nil
+	}
+
 	gasUsed := st.msg.GasLimits
 	gasUsed[types.ExecutionGasIndex] = st.gasUsed()
 

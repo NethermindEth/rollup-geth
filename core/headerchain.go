@@ -222,19 +222,13 @@ func (hc *HeaderChain) WriteHeaders(headers []*types.Header) (int, error) {
 		newTD.Add(newTD, header.Difficulty)
 
 		//[rollup-geth] EIP-7706
-		if header.BaseFees == nil {
-			var parent *types.Header
-			if i > 0 {
-				parent = headers[i-1]
-			} else {
-				parent = hc.GetHeader(header.ParentHash, header.Number.Uint64()-1)
-			}
-
-			baseFees, err := eip7706.CalcBaseFeesFromParentHeader(hc.config, parent)
-			if err == nil {
-				header.BaseFees = baseFees
-			}
+		var parent *types.Header
+		if i > 0 {
+			parent = headers[i-1]
+		} else {
+			parent = hc.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 		}
+		setBaseFeesForHeader(header, parent, hc.config)
 
 		// If the parent was not present, store it
 		// If the header is already known, skip it, otherwise store
@@ -666,4 +660,19 @@ func (hc *HeaderChain) Engine() consensus.Engine { return hc.engine }
 // a header chain does not have blocks available for retrieval.
 func (hc *HeaderChain) GetBlock(hash common.Hash, number uint64) *types.Block {
 	return nil
+}
+
+// [rollup-geth] EIP-7706
+func setBaseFeesForHeader(header *types.Header, parent *types.Header, config *params.ChainConfig) {
+	if baseFeesAlreadySet := header.BaseFees != nil; baseFeesAlreadySet {
+		return
+	}
+	if notEIP7706Block := !config.IsEIP7706(header.Number, header.Time); notEIP7706Block {
+		return
+	}
+
+	baseFees, err := eip7706.CalcBaseFeesFromParentHeader(config, parent)
+	if err == nil {
+		header.BaseFees = baseFees
+	}
 }

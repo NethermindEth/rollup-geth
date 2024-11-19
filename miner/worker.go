@@ -312,7 +312,9 @@ func (miner *Miner) applyTransaction(env *environment, tx *types.Transaction) (*
 	}
 
 	//[rollup-geth] EIP-7706
-	env.header.GasUsedVector = receipt.GasUsedVector
+	if miner.chainConfig.IsEIP7706(env.header.Number, env.header.Time) {
+		env.header.GasUsedVector = receipt.GasUsedVector
+	}
 
 	return receipt, err
 }

@@ -80,9 +80,9 @@ type ExecutableData struct {
 	ExecutionWitness *types.ExecutionWitness `json:"executionWitness,omitempty"`
 
 	//[rollup-geth] Add EIP-7706 specific fields
-	GasLimits     types.VectorGasLimit `json:"gasLimits"`
-	GasUsedVector types.VectorGasLimit `json:"gasUsedVector"`
-	ExcessGas     types.VectorGasLimit `json:"excessGas"`
+	GasLimits     types.VectorGasLimit `json:"gasLimits,omitempty"`
+	GasUsedVector types.VectorGasLimit `json:"gasUsedVector,omitempty"`
+	ExcessGas     types.VectorGasLimit `json:"excessGas,omitempty"`
 }
 
 // JSON type overrides for executableData.
@@ -308,7 +308,6 @@ func ExecutableDataToBlockNoHash(data ExecutableData, versionedHashes []common.H
 		nil
 }
 
-// TODO: [rollup-geth] Add EIP-7706 fields
 // BlockToExecutableData constructs the ExecutableData structure by filling the
 // fields from the given block. It assumes the given block is post-merge block.
 func BlockToExecutableData(block *types.Block, fees *big.Int, sidecars []*types.BlobTxSidecar) *ExecutionPayloadEnvelope {
