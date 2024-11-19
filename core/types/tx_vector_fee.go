@@ -170,3 +170,5 @@ func (tx *VectorFeeTx) copy() TxData {
 
 	return cpy
 }
+
+func (tx *VectorFeeTx) isSystemTx() bool { return false }

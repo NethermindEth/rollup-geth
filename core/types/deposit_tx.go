@@ -101,3 +101,8 @@ func (tx *DepositTx) encode(b *bytes.Buffer) error {
 func (tx *DepositTx) decode(input []byte) error {
 	return rlp.DecodeBytes(input, tx)
 }
+
+// [rollup-geth] EIP-7706
+func (tx *DepositTx) gasTipCaps() VectorFeeBigint { return nil }
+func (tx *DepositTx) gasFeeCaps() VectorFeeBigint { return nil }
+func (tx *DepositTx) gasLimits() VectorGasLimit   { return nil }
