@@ -57,8 +57,8 @@ type txJSON struct {
 	Hash common.Hash `json:"hash"`
 
 	//[rollup-geth] EIP-7706
-	GasTipCaps VectorFeeUint `json: "gasTipCaps"`
-	GasFeeCaps VectorFeeUint `json:"gasFeeCaps"`
+	GasTipCaps VectorFeeBigint `json:"gasTipCaps`
+	GasFeeCaps VectorFeeBigint `json:"gasFeeCaps"`
 }
 
 // yParityValue returns the YParity value from JSON. For backwards-compatibility reasons,
@@ -178,9 +178,10 @@ func (tx *Transaction) MarshalJSON() ([]byte, error) {
 		}
 
 		//[rollup-geth] EIP-7706
-		enc.GasFeeCaps = itx.GasFeeCaps
-		enc.GasTipCaps = itx.GasTipCaps
+		enc.GasFeeCaps = itx.GasFeeCaps.ToVectorBigInt()
+		enc.GasTipCaps = itx.GasTipCaps.ToVectorBigInt()
 	}
+
 	return json.Marshal(&enc)
 }
 
@@ -455,9 +456,6 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 			return errors.New("missing required field 'gas' for txdata")
 		}
 		itx.Gas = uint64(*dec.Gas)
-		if dec.MaxPriorityFeePerGas == nil {
-			return errors.New("missing required field 'maxPriorityFeePerGas' for txdata")
-		}
 		itx.Value = uint256.MustFromBig((*big.Int)(dec.Value))
 		if dec.Input == nil {
 			return errors.New("missing required field 'input' in transaction")
@@ -504,8 +502,8 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 		}
 
 		//[rollup-geth] EIP-7706
-		itx.GasTipCaps = dec.GasTipCaps
-		itx.GasFeeCaps = dec.GasFeeCaps
+		itx.GasTipCaps = dec.GasTipCaps.ToVectorUint()
+		itx.GasFeeCaps = dec.GasFeeCaps.ToVectorUint()
 
 	default:
 		return ErrTxTypeNotSupported

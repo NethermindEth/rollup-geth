@@ -202,6 +202,14 @@ func (vec VectorFeeBigint) VecBitLenAllLessEqThan256() bool {
 	return true
 }
 
+func (vec VectorFeeBigint) ToVectorUint() VectorFeeUint {
+	result := make(VectorFeeUint, VectorFeeTypesCount)
+	for i, v := range vec {
+		result[i], _ = uint256.FromBig(v)
+	}
+	return result
+}
+
 // ToVectorBigInt converts a VectorGasLimit to VectorFeeBigint.
 func (vec VectorGasLimit) ToVectorBigInt() VectorFeeBigint {
 	result := make(VectorFeeBigint, VectorFeeTypesCount)
