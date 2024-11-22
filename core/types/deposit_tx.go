@@ -103,6 +103,12 @@ func (tx *DepositTx) decode(input []byte) error {
 }
 
 // [rollup-geth] EIP-7706
-func (tx *DepositTx) gasTipCaps() VectorFeeBigint { return nil }
-func (tx *DepositTx) gasFeeCaps() VectorFeeBigint { return nil }
-func (tx *DepositTx) gasLimits() VectorGasLimit   { return nil }
+func (tx *DepositTx) gasTipCaps() VectorFeeBigint {
+	return VectorFeeBigint{new(big.Int), new(big.Int), new(big.Int)}
+}
+func (tx *DepositTx) gasFeeCaps() VectorFeeBigint {
+	return VectorFeeBigint{new(big.Int), new(big.Int), new(big.Int)}
+}
+func (tx *DepositTx) gasLimits() VectorGasLimit {
+	return VectorGasLimit{0, 0, 0}
+}

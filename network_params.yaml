@@ -1,0 +1,13 @@
+optimism_package:
+  chains:
+    - participants:
+        - el_type: op-geth
+          el_image: "op-rollup-geth:v1.0.14"
+          cl_type: op-node
+          cl_image: "op-node-test:v1.0.1"
+# ethereum_package:
+#   participants:
+#     - el_type: geth
+#       el_image: "op-rollup-geth:v1.0.14"
+#   network_params:
+#     preset: minimal

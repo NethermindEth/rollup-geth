@@ -102,7 +102,6 @@ type ExecutableData struct {
 }
 
 // JSON type overrides for executableData.
-// TODO:: [rollup-geth] Add EIP-7706 specific fields
 type executableDataMarshaling struct {
 	Number        hexutil.Uint64
 	GasLimit      hexutil.Uint64
@@ -114,6 +113,11 @@ type executableDataMarshaling struct {
 	Transactions  []hexutil.Bytes
 	BlobGasUsed   *hexutil.Uint64
 	ExcessBlobGas *hexutil.Uint64
+
+	//[rollup-geth] Add EIP-7706 specific fields
+	GasLimits     types.VectorGasLimit
+	GasUsedVector types.VectorGasLimit
+	ExcessGas     types.VectorGasLimit
 }
 
 // StatelessPayloadStatusV1 is the result of a stateless payload execution.
@@ -354,6 +358,7 @@ func BlockToExecutableData(block *types.Block, fees *big.Int, sidecars []*types.
 		GasUsedVector: block.Header().GasUsedVector,
 		ExcessGas:     block.Header().ExcessGas,
 	}
+
 	bundle := BlobsBundleV1{
 		Commitments: make([]hexutil.Bytes, 0),
 		Blobs:       make([]hexutil.Bytes, 0),

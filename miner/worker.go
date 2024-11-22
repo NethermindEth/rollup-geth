@@ -449,10 +449,15 @@ func (miner *Miner) applyTransaction(env *environment, tx *types.Transaction) (*
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		env.gasPool.SetGas(gp)
+
+		log.Error("Miner apply transaction failed", "err", err)
+		log.Error("Miner apply transaction failed", "tx", tx.Type())
+		return receipt, err
 	}
 
 	//[rollup-geth] EIP-7706
 	if miner.chainConfig.IsEIP7706(env.header.Number, env.header.Time) {
+		log.Info("Miner", "setting gs used vector", receipt.GasUsedVector)
 		env.header.GasUsedVector = receipt.GasUsedVector
 	}
 

@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip7706"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
@@ -283,6 +284,7 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *triedb.Database, g
 	}
 	applyOverrides := func(config *params.ChainConfig) {
 		if config != nil {
+			log.Info("setting up gensesis config")
 			// If applying the superchain-registry to a known OP-Stack chain,
 			// then override the local chain-config with that from the registry.
 			if overrides != nil && overrides.ApplySuperchainUpgrades && config.IsOptimism() && config.ChainID != nil && config.ChainID.IsUint64() {
@@ -325,6 +327,9 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *triedb.Database, g
 			if overrides != nil && overrides.OverrideOptimismInterop != nil {
 				config.InteropTime = overrides.OverrideOptimismInterop
 			}
+
+			eip7706Time := uint64(0)
+			config.EIP7706Time = &eip7706Time
 		}
 	}
 	// Just commit the new block if there is no stored genesis block.
@@ -548,6 +553,10 @@ func (g *Genesis) toBlockWithRoot(root common.Hash) *types.Block {
 		if conf.IsPrague(num, g.Timestamp) {
 			head.RequestsHash = &types.EmptyRequestsHash
 			requests = make(types.Requests, 0)
+		}
+
+		if conf.IsEIP7706(num, g.Timestamp) {
+			head.GasUsedVector, head.ExcessGas, head.ExcessGas = eip7706.SanitizeEIP7706Fields(head)
 		}
 	}
 	return types.NewBlock(head, &types.Body{Withdrawals: withdrawals, Requests: requests}, nil, trie.NewStackTrie(nil))

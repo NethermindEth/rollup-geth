@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 )
@@ -221,6 +222,9 @@ func (tx *Transaction) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarshals from JSON.
 func (tx *Transaction) UnmarshalJSON(input []byte) error {
 	var dec txJSON
+
+	log.Info("UnmarshalJSON input:", "json", string(input))
+
 	err := json.Unmarshal(input, &dec)
 	if err != nil {
 		return err

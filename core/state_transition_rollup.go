@@ -42,6 +42,13 @@ func TransactionToMessageEIP7706(tx *types.Transaction, s types.Signer, baseFees
 		BlobHashes:       tx.BlobHashes(),
 		BlobGasFeeCap:    tx.BlobGasFeeCap(),
 
+		// Optimism
+		IsSystemTx:     tx.IsSystemTx(),
+		IsDepositTx:    tx.IsDepositTx(),
+		Mint:           tx.Mint(),
+		RollupCostData: tx.RollupCostData(),
+
+		//[rollup-geth]
 		GasFeeCaps:         tx.GasFeeCaps(),
 		GasTipCaps:         tx.GasTipCaps(),
 		GasLimits:          tx.GasLimits(),
@@ -298,7 +305,7 @@ func (st *StateTransition) preCheckGasEIP7706() error {
 		return fmt.Errorf("EIP-7706: %w: address %v", ErrTipAboveFeeCap, msg.From.Hex())
 	}
 	if !st.evm.Context.BaseFees.VectorAllLessOrEqual(msg.GasFeeCaps) {
-		return fmt.Errorf("EIP-7706: %w: address %v", ErrFeeCapTooLow, msg.From.Hex())
+		return fmt.Errorf("EIP-7706: %w: address %v, baseFees: %s, maxFeePerGas: %s", ErrFeeCapTooLow, msg.From.Hex(), st.evm.Context.BaseFees, msg.GasFeeCaps)
 	}
 
 	return nil

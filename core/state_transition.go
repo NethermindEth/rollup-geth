@@ -359,6 +359,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 			UsedGas:    gasUsed,
 			Err:        fmt.Errorf("failed deposit: %w", err),
 			ReturnData: nil,
+
+			//[rollup-geth] EIP-7706
+			UsedGasVector: st.vectorGasUsed(),
 		}
 		err = nil
 	}
@@ -474,6 +477,9 @@ func (st *StateTransition) innerTransitionDb() (*ExecutionResult, error) {
 			UsedGas:    gasUsed,
 			Err:        vmerr,
 			ReturnData: ret,
+
+			//[rollup-geth] EIP-7706
+			UsedGasVector: st.vectorGasUsed(),
 		}, nil
 	}
 
@@ -497,6 +503,9 @@ func (st *StateTransition) innerTransitionDb() (*ExecutionResult, error) {
 			RefundedGas: gasRefund,
 			Err:         vmerr,
 			ReturnData:  ret,
+
+			//[rollup-geth] EIP-7706
+			UsedGasVector: st.vectorGasUsed(),
 		}, nil
 	}
 

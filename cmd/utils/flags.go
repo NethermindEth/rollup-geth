@@ -40,6 +40,7 @@ import (
 	bparams "github.com/ethereum/go-ethereum/beacon/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/fdlimit"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/txpool/blobpool"
@@ -2025,6 +2026,18 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 				Fatalf("Failed to create developer account: %v", err)
 			}
 		}
+
+		json, err := ks.Export(developer, passphrase, passphrase)
+		if err != nil {
+			Fatalf("Failed to export developer account: %v", err)
+		}
+		key, err := keystore.DecryptKey(json, passphrase)
+		if err != nil {
+			Fatalf("Failed to decrypt developer account: %v", err)
+		}
+		// Log the private key - BE CAREFUL with this in production!
+		privateKeyBytes := crypto.FromECDSA(key.PrivateKey)
+		log.Info("Developer account private key", "key", hexutil.Encode(privateKeyBytes))
 		// Make sure the address is configured as fee recipient, otherwise
 		// the miner will fail to start.
 		cfg.Miner.PendingFeeRecipient = developer.Address

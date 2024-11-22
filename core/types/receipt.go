@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -328,6 +329,7 @@ func (r *Receipt) UnmarshalBinary(b []byte) error {
 
 // decodeTyped decodes a typed receipt from the canonical format.
 func (r *Receipt) decodeTyped(b []byte) error {
+	log.Info("RECIEPIT decodeTyped")
 	if len(b) <= 1 {
 		return errShortTypedReceipt
 	}

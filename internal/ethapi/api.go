@@ -888,7 +888,12 @@ func (api *BlockChainAPI) GetBlockByNumber(ctx context.Context, number rpc.Block
 // GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
 // detail, otherwise only the transaction hash is returned.
 func (api *BlockChainAPI) GetBlockByHash(ctx context.Context, hash common.Hash, fullTx bool) (map[string]interface{}, error) {
+	log.Info(" ==== EHTapi GETBLOCK BY HASH", "hash", hash.String())
 	block, err := api.b.BlockByHash(ctx, hash)
+	if err != nil {
+		log.Error("ethapi get block by hash", "err", err)
+	}
+
 	if block != nil {
 		return RPCMarshalBlock(ctx, block, true, fullTx, api.b.ChainConfig(), api.b)
 	}
@@ -1551,6 +1556,8 @@ func RPCMarshalBlock(ctx context.Context, block *types.Block, inclTx bool, fullT
 		}
 		fields["transactions"] = transactions
 	}
+
+	log.Info("TXS done")
 	uncles := block.Uncles()
 	uncleHashes := make([]common.Hash, len(uncles))
 	for i, uncle := range uncles {
@@ -1563,6 +1570,7 @@ func RPCMarshalBlock(ctx context.Context, block *types.Block, inclTx bool, fullT
 	if block.Header().RequestsHash != nil {
 		fields["requests"] = block.Requests()
 	}
+	log.Info("RPC MARSHALING BLOCK done")
 	return fields, nil
 }
 
@@ -1602,8 +1610,11 @@ type RPCTransaction struct {
 // newRPCTransaction returns a transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
 func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, blockTime uint64, index uint64, baseFee *big.Int, config *params.ChainConfig, receipt *types.Receipt) *RPCTransaction {
+	log.Info("newRPCTransaction")
 	signer := types.MakeSigner(config, new(big.Int).SetUint64(blockNumber), blockTime)
+	log.Info("newRPCTransaction signer done")
 	from, _ := types.Sender(signer, tx)
+	log.Info("newRPCTransaction sender  done")
 	v, r, s := tx.RawSignatureValues()
 	result := &RPCTransaction{
 		Type:     hexutil.Uint64(tx.Type()),
@@ -1725,6 +1736,7 @@ func NewRPCPendingTransaction(tx *types.Transaction, current *types.Header, conf
 
 // newRPCTransactionFromBlockIndex returns a transaction that will serialize to the RPC representation.
 func newRPCTransactionFromBlockIndex(ctx context.Context, b *types.Block, index uint64, config *params.ChainConfig, backend Backend) *RPCTransaction {
+	log.Info("newRPCTransactionFromBlockIndex")
 	txs := b.Transactions()
 	if index >= uint64(len(txs)) {
 		return nil
