@@ -65,7 +65,7 @@ type txJSON struct {
 	// Only used for encoding:
 	Hash common.Hash `json:"hash"`
 
-	GasTipCaps VectorFeeBigint `json:"gasTipCaps`
+	GasTipCaps VectorFeeBigint `json:"gasTipCaps"`
 	GasFeeCaps VectorFeeBigint `json:"gasFeeCaps"`
 }
 

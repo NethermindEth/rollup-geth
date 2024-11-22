@@ -1608,7 +1608,7 @@ type RPCTransaction struct {
 
 	//[rollup-geth] EIP-7706
 
-	GasTipCaps types.VectorFeeBigint `json:"gasTipCaps`
+	GasTipCaps types.VectorFeeBigint `json:"gasTipCaps"`
 	GasFeeCaps types.VectorFeeBigint `json:"gasFeeCaps"`
 }
 
@@ -1706,6 +1706,7 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		result.BlobVersionedHashes = tx.BlobHashes()
 
 	case types.VectorFeeTxType:
+		log.Info("Marhsaling vector fee tx")
 		al := tx.AccessList()
 		yparity := hexutil.Uint64(v.Sign())
 		result.Accesses = &al
