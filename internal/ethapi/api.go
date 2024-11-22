@@ -1555,6 +1555,8 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		result.BlobVersionedHashes = tx.BlobHashes()
 		result.GasFeeCaps = tx.GasFeeCaps()
 		result.GasTipCaps = tx.GasTipCaps()
+
+		result.BlobVersionedHashes = tx.BlobHashes()
 	}
 	return result
 }
