@@ -1605,16 +1605,18 @@ type RPCTransaction struct {
 	IsSystemTx *bool        `json:"isSystemTx,omitempty"`
 	// deposit-tx post-Canyon only
 	DepositReceiptVersion *hexutil.Uint64 `json:"depositReceiptVersion,omitempty"`
+
+	//[rollup-geth] EIP-7706
+
+	GasTipCaps types.VectorFeeBigint `json:"gasTipCaps`
+	GasFeeCaps types.VectorFeeBigint `json:"gasFeeCaps"`
 }
 
 // newRPCTransaction returns a transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
 func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, blockTime uint64, index uint64, baseFee *big.Int, config *params.ChainConfig, receipt *types.Receipt) *RPCTransaction {
-	log.Info("newRPCTransaction")
 	signer := types.MakeSigner(config, new(big.Int).SetUint64(blockNumber), blockTime)
-	log.Info("newRPCTransaction signer done")
 	from, _ := types.Sender(signer, tx)
-	log.Info("newRPCTransaction sender  done")
 	v, r, s := tx.RawSignatureValues()
 	result := &RPCTransaction{
 		Type:     hexutil.Uint64(tx.Type()),
@@ -1702,6 +1704,16 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		}
 		result.MaxFeePerBlobGas = (*hexutil.Big)(tx.BlobGasFeeCap())
 		result.BlobVersionedHashes = tx.BlobHashes()
+
+	case types.VectorFeeTxType:
+		al := tx.AccessList()
+		yparity := hexutil.Uint64(v.Sign())
+		result.Accesses = &al
+		result.ChainID = (*hexutil.Big)(tx.ChainId())
+		result.YParity = &yparity
+		result.BlobVersionedHashes = tx.BlobHashes()
+		result.GasFeeCaps = tx.GasFeeCaps()
+		result.GasTipCaps = tx.GasTipCaps()
 	}
 	return result
 }
