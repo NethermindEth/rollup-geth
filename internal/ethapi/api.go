@@ -1607,7 +1607,6 @@ type RPCTransaction struct {
 	DepositReceiptVersion *hexutil.Uint64 `json:"depositReceiptVersion,omitempty"`
 
 	//[rollup-geth] EIP-7706
-
 	GasTipCaps types.VectorFeeBigint `json:"gasTipCaps"`
 	GasFeeCaps types.VectorFeeBigint `json:"gasFeeCaps"`
 }
@@ -1706,7 +1705,6 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		result.BlobVersionedHashes = tx.BlobHashes()
 
 	case types.VectorFeeTxType:
-		log.Info("Marhsaling vector fee tx")
 		al := tx.AccessList()
 		yparity := hexutil.Uint64(v.Sign())
 		result.Accesses = &al
@@ -1715,6 +1713,8 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		result.BlobVersionedHashes = tx.BlobHashes()
 		result.GasFeeCaps = tx.GasFeeCaps()
 		result.GasTipCaps = tx.GasTipCaps()
+
+		result.BlobVersionedHashes = tx.BlobHashes()
 	}
 	return result
 }
