@@ -1468,8 +1468,8 @@ type RPCTransaction struct {
 	S                   *hexutil.Big      `json:"s"`
 	YParity             *hexutil.Uint64   `json:"yParity,omitempty"`
 
-		//[rollup-geth] EIP-7706
-	GasTipCaps types.VectorFeeBigint `json:"gasTipCaps`
+	//[rollup-geth] EIP-7706
+	GasTipCaps types.VectorFeeBigint `json:"gasTipCaps"`
 	GasFeeCaps types.VectorFeeBigint `json:"gasFeeCaps"`
 }
 
