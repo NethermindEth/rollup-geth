@@ -78,12 +78,12 @@ func MakeSureEIP7706FieldsAreNonNil(header *types.Header) error {
 }
 
 // SanitizeEIP7706Fields either returns the EIP-7706 existing field values or fallbacks to defaults
-func SanitizeEIP7706Fields(header *types.Header) (types.VectorGasLimit, types.VectorGasLimit, types.VectorGasLimit) {
+func SanitizeEIP7706Fields(header *types.Header) (gasUsed, excessGas, gasLimits types.VectorGasLimit) {
 	if noEIP7706FieldsInHeaderErr := MakeSureEIP7706FieldsAreNonNil(header); noEIP7706FieldsInHeaderErr != nil {
 		//TODO: are these defaults ok?
-		gasUsed := types.VectorGasLimit{header.GasUsed, *header.BlobGasUsed, header.GasUsed / params.CallDataGasLimitRatio}
-		excessGas := types.VectorGasLimit{0, *header.ExcessBlobGas, 0}
-		gasLimits := types.VectorGasLimit{header.GasLimit, params.MaxBlobGasPerBlock, header.GasLimit / params.CallDataGasLimitRatio}
+		gasUsed = types.VectorGasLimit{header.GasUsed, *header.BlobGasUsed, header.GasUsed / params.CallDataGasLimitRatio}
+		excessGas = types.VectorGasLimit{0, *header.ExcessBlobGas, 0}
+		gasLimits = types.VectorGasLimit{header.GasLimit, params.MaxBlobGasPerBlock, header.GasLimit / params.CallDataGasLimitRatio}
 
 		return gasUsed, excessGas, gasLimits
 	}

@@ -259,7 +259,7 @@ func (st *StateTransition) preCheckGasEIP7706() error {
 		return fmt.Errorf("EIP-7706: %w: address %v", ErrTipAboveFeeCap, msg.From.Hex())
 	}
 	if !st.evm.Context.BaseFees.VectorAllLessOrEqual(msg.GasFeeCaps) {
-		return fmt.Errorf("EIP-7706: %w: address %v", ErrFeeCapTooLow, msg.From.Hex())
+		return fmt.Errorf("EIP-7706: %w: address %v, baseFees: %s, maxFeePerGas: %s", ErrFeeCapTooLow, msg.From.Hex(), st.evm.Context.BaseFees, msg.GasFeeCaps)
 	}
 
 	return nil
@@ -383,4 +383,18 @@ func (st *StateTransition) vectorGasRemaining() types.VectorGasLimit {
 	//NOTE: 2 msg.GasLimits[0] == msg.GasLimit == st.initialGas
 	// this is why this holds
 	return st.msg.GasLimits.VectorSubtractClampAtZero(st.vectorGasUsed())
+}
+
+func NewExecutionResult(usedGas, gasRefund uint64, usedGasVector types.VectorGasLimit, returnData []byte, vmErr error) *ExecutionResult {
+	e := ExecutionResult{
+		UsedGas:     usedGas,
+		RefundedGas: gasRefund,
+		Err:         vmErr,
+		ReturnData:  returnData,
+
+		//[rollup-geth] EIP-7706
+		UsedGasVector: usedGasVector,
+	}
+
+	return &e
 }
