@@ -22,9 +22,9 @@ func (tx *Transaction) EffectiveGasTips(baseFees VectorFeeBigint) VectorFeeBigin
 	effectiveTips := make(VectorFeeBigint, VectorFeeTypesCount)
 	for i, baseFee := range baseFees {
 		if baseFee == nil {
-			effectiveTips[i].Set(gasTipCaps[i])
+			effectiveTips[i] = new(big.Int).Set(gasTipCaps[i])
 		} else {
-			effectiveTips[i] = math.BigMin(gasTipCaps[i], effectiveTips[i].Sub(gasFeeCaps[i], baseFee))
+			effectiveTips[i] = math.BigMin(gasTipCaps[i], new(big.Int).Sub(gasFeeCaps[i], baseFee))
 		}
 	}
 
@@ -39,9 +39,9 @@ func (tx *Transaction) EffectiveGasPrices(baseFees VectorFeeBigint) VectorFeeBig
 
 	for i, baseFee := range baseFees {
 		if baseFee == nil {
-			effectiveFees[i].Set(gasFeeCaps[i])
+			effectiveFees[i] = new(big.Int).Set(gasFeeCaps[i])
 		} else {
-			effectiveFees[i] = math.BigMin(effectiveFees[i].Add(gasTipCaps[i], baseFee), gasFeeCaps[i])
+			effectiveFees[i] = math.BigMin(new(big.Int).Add(gasTipCaps[i], baseFee), gasFeeCaps[i])
 		}
 	}
 

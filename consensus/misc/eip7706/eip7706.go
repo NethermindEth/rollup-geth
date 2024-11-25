@@ -97,15 +97,8 @@ func CalcBaseFeesFromParentHeader(config *params.ChainConfig, parent *types.Head
 		return nil, errors.New("parent header is nil")
 	}
 
-	if !config.IsEIP7706(parent.Number, parent.Time) {
-		return nil, errors.New("Parent is not an EIP-7706 block")
-	}
-
-	if err := MakeSureEIP7706FieldsAreNonNil(parent); err != nil {
-		return nil, err
-	}
-
-	return CalcBaseFees(parent.ExcessGas, parent.GasLimits), nil
+	_, excessGas, gasLimits := SanitizeEIP7706Fields(parent)
+	return CalcBaseFees(excessGas, gasLimits), nil
 }
 
 // CalcBaseFees  calculates vector of the base fees for current block header given parent excess gas and targets

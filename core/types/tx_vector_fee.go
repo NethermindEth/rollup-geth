@@ -98,11 +98,22 @@ func (tx *VectorFeeTx) blobGas() uint64 {
 	return params.BlobTxBlobGasPerBlob * uint64(len(tx.BlobHashes))
 }
 
-// TODO: check if this is indeed proper implemenation
+// TODO: check if this is indeed proper implementation
 // NOTE: These methods are needed to satisfy TxData Interface
-func (tx *VectorFeeTx) gasFeeCap() *big.Int                                       { return nil }
-func (tx *VectorFeeTx) gasTipCap() *big.Int                                       { return nil }
-func (tx *VectorFeeTx) gasPrice() *big.Int                                        { return nil }
+func (tx *VectorFeeTx) gasFeeCap() *big.Int {
+	if s, err := tx.GasFeeCaps.ToVectorBigInt().Sum(); err == nil {
+		return s
+	}
+	return nil
+}
+
+func (tx *VectorFeeTx) gasTipCap() *big.Int {
+	if s, err := tx.GasTipCaps.ToVectorBigInt().Sum(); err == nil {
+		return s
+	}
+	return nil
+}
+func (tx *VectorFeeTx) gasPrice() *big.Int                                        { return tx.gasFeeCap() }
 func (tx *VectorFeeTx) effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int { return nil }
 
 func (tx *VectorFeeTx) copy() TxData {

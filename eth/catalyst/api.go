@@ -874,8 +874,6 @@ func (api *ConsensusAPI) newPayload(params engine.ExecutableData, versionedHashe
 		return api.delayPayloadImport(block), nil
 	}
 
-	//TODO: [rollup-geth] calculate BaseFees for EIP-7706 block
-
 	// We have an existing parent, do some sanity checks to avoid the beacon client
 	// triggering too early
 	var (

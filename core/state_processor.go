@@ -82,7 +82,6 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		ProcessParentBlockHash(block.ParentHash(), vmenv, statedb)
 	}
 
-	//[rollup-geth] EIP-7706
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		msg, err := TransactionToMessage(tx, signer, header, p.config)
@@ -187,6 +186,10 @@ func MakeReceipt(evm *vm.EVM, result *ExecutionResult, statedb *state.StateDB, b
 	receipt.BlockHash = blockHash
 	receipt.BlockNumber = blockNumber
 	receipt.TransactionIndex = uint(statedb.TxIndex())
+
+	//[rollup-geth] EIP-7706
+	receipt.GasUsedVector = result.UsedGasVector
+
 	return receipt
 }
 

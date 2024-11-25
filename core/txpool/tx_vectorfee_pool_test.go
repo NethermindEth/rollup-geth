@@ -44,7 +44,7 @@ func TestVectorFeePool_Add(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			errs := pool.Add([]*types.Transaction{tt.tx}, false, false)
-			assert.Len(t, errs, 0)
+			allErrorsNil(t, errs)
 			assert.Len(t, pool.txs, 1)
 			assert.Len(t, pool.txsByAddress, 1)
 			assert.Len(t, pool.txsByAddress[addr], 1)
@@ -71,7 +71,7 @@ func TestVectorFeePool_Pending(t *testing.T) {
 	}
 
 	errs := pool.Add(txs, false, false)
-	assert.Empty(t, errs)
+	allErrorsNil(t, errs)
 
 	pending := pool.Pending(PendingFilter{})
 	assert.Len(t, pending[addr], 3)
@@ -86,7 +86,7 @@ func TestVectorFeePool_Reset(t *testing.T) {
 	// Add a transaction
 	tx := createSignedVectorFeeTx(t, 0, recipient, big.NewInt(1), 21000, key)
 	errs := pool.Add([]*types.Transaction{tx}, false, false)
-	assert.Empty(t, errs)
+	allErrorsNil(t, errs)
 
 	// Verify it's in the pool
 	assert.True(t, pool.Has(tx.Hash()))
@@ -131,7 +131,7 @@ func TestVectorFeePool_Get(t *testing.T) {
 	// Add a transaction
 	tx := createSignedVectorFeeTx(t, 0, recipient, big.NewInt(1000), 21000, key)
 	errs := pool.Add([]*types.Transaction{tx}, false, false)
-	assert.Empty(t, errs)
+	allErrorsNil(t, errs)
 
 	// Test Get
 	retrieved := pool.Get(tx.Hash())
@@ -160,7 +160,7 @@ func TestVectorFeePool_Nonce(t *testing.T) {
 	}
 
 	errs := pool.Add(txs, false, false)
-	assert.Empty(t, errs)
+	allErrorsNil(t, errs)
 
 	// Check nonce after adding transactions
 	assert.Equal(t, uint64(3), pool.Nonce(addr))
@@ -279,4 +279,10 @@ func getBlockChianConfig() *params.ChainConfig {
 	}
 
 	return &blockChainConfig
+}
+
+func allErrorsNil(t *testing.T, errs []error) {
+	for _, err := range errs {
+		assert.NoError(t, err)
+	}
 }

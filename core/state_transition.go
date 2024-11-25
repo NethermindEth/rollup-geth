@@ -37,6 +37,9 @@ type ExecutionResult struct {
 	RefundedGas uint64 // Total gas refunded after execution
 	Err         error  // Any error encountered during the execution(listed in core/vm/errors.go)
 	ReturnData  []byte // Returned data from evm(function result or data supplied with revert opcode)
+
+	//[rollup-geth] EIP-7706
+	UsedGasVector types.VectorGasLimit
 }
 
 // Unwrap returns the internal evm error which allows us for further
@@ -406,6 +409,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		RefundedGas: gasRefund,
 		Err:         vmerr,
 		ReturnData:  ret,
+
+		//[rollup-geth] EIP-7706
+		UsedGasVector: st.vectorGasUsed(),
 	}, nil
 }
 
