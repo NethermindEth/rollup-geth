@@ -156,6 +156,8 @@ type CallMsg struct {
 	// For BlobTxType
 	BlobGasFeeCap *big.Int
 	BlobHashes    []common.Hash
+
+	//TODO: [rollup-geth] add EIP-7706 missing fields
 }
 
 // A ContractCaller provides contract calls, essentially transactions that are executed by

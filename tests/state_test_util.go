@@ -238,6 +238,7 @@ func (t *StateTest) RunNoVerify(subtest StateSubtest, vmconfig vm.Config, snapsh
 	block := t.genesis(config).ToBlock()
 	st = MakePreState(rawdb.NewMemoryDatabase(), t.json.Pre, snapshotter, scheme)
 
+	//TODO: [rollup-geth] what about EIP-7706 fields
 	var baseFee *big.Int
 	if config.IsLondon(new(big.Int)) {
 		baseFee = t.json.Env.BaseFee

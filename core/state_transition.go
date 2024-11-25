@@ -149,8 +149,7 @@ type Message struct {
 	// When SkipFromEOACheck is true, the message sender is not checked to be an EOA.
 	SkipFromEOACheck bool
 
-	//[rollup-geth]
-	EffectiveGasTip    *big.Int
+	//[rollup-geth] EIP-7706
 	EffectiveGasPrices types.VectorFeeBigint
 	EffectiveGasTips   types.VectorFeeBigint
 
@@ -159,10 +158,8 @@ type Message struct {
 	GasTipCaps types.VectorFeeBigint
 }
 
-// TODO: go through all the references of this function call and see where we have to update to our newly added  TransactionToMessageEIP7706
-
 // TransactionToMessage converts a transaction into a Message.
-func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.Int) (*Message, error) {
+func TransactionToMessageEIP4844(tx *types.Transaction, s types.Signer, baseFee *big.Int) (*Message, error) {
 	msg := &Message{
 		Nonce:            tx.Nonce(),
 		GasLimit:         tx.Gas(),
@@ -177,12 +174,11 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		BlobHashes:       tx.BlobHashes(),
 		BlobGasFeeCap:    tx.BlobGasFeeCap(),
 
-		//[rollup-geth]
-		GasFeeCaps:      tx.GasFeeCaps(),
-		GasTipCaps:      tx.GasTipCaps(),
-		GasLimits:       tx.GasLimits(),
-		EffectiveGasTip: tx.EffectiveGasTipValue(baseFee),
-		GasPrice:        tx.EffectiveGasPrice(baseFee), //[rollup-geth]
+		//[rollup-geth] EIP-7706 added fields
+		GasFeeCaps: tx.GasFeeCaps(),
+		GasTipCaps: tx.GasTipCaps(),
+		GasLimits:  tx.GasLimits(),
+		GasPrice:   tx.EffectiveGasPrice(baseFee),
 	}
 
 	var err error
@@ -389,14 +385,20 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	var gasRefund uint64
 	if !rules.IsLondon {
 		// Before EIP-3529: refunds were capped to gasUsed / 2
-		gasRefund = st.refundGas(params.RefundQuotient)
+		gasRefund, err = st.refundGas(params.RefundQuotient)
 	} else {
 		// After EIP-3529: refunds are capped to gasUsed / 5
-		gasRefund = st.refundGas(params.RefundQuotientEIP3529)
+		gasRefund, err = st.refundGas(params.RefundQuotientEIP3529)
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	// [rollup-geth]
-	st.payTheTip(rules, msg)
+	if err := st.payTheTip(rules, msg); err != nil {
+		return nil, err
+	}
 
 	return &ExecutionResult{
 		// TODO: this should be vector [execution_gas, blobl_gas, calldata_gas]
@@ -407,7 +409,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}, nil
 }
 
-func (st *StateTransition) refundGas(refundQuotient uint64) uint64 {
+func (st *StateTransition) refundGas(refundQuotient uint64) (uint64, error) {
 	// Apply refund counter, capped to a refund quotient
 	refund := st.gasUsed() / refundQuotient
 	if refund > st.state.GetRefund() {
@@ -422,7 +424,9 @@ func (st *StateTransition) refundGas(refundQuotient uint64) uint64 {
 
 	// Return ETH for remaining gas, exchanged at the original rate.
 	// [rollup-geth]
-	st.refundGasToAddress()
+	if err := st.refundGasToAddress(); err != nil {
+		return 0, err
+	}
 
 	if st.evm.Config.Tracer != nil && st.evm.Config.Tracer.OnGasChange != nil && st.gasRemaining > 0 {
 		st.evm.Config.Tracer.OnGasChange(st.gasRemaining, 0, tracing.GasChangeTxLeftOverReturned)
@@ -432,7 +436,7 @@ func (st *StateTransition) refundGas(refundQuotient uint64) uint64 {
 	// available for the next transaction.
 	st.gp.AddGas(st.gasRemaining)
 
-	return refund
+	return refund, nil
 }
 
 // gasUsed returns the amount of gas used up by the state transition.

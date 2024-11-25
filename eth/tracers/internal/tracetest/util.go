@@ -34,6 +34,7 @@ type callContext struct {
 	BaseFee    *math.HexOrDecimal256 `json:"baseFeePerGas"`
 }
 
+// TODO: [rollup-geth] EIP-7706 add and map missing fields
 func (c *callContext) toBlockContext(genesis *core.Genesis) vm.BlockContext {
 	context := vm.BlockContext{
 		CanTransfer: core.CanTransfer,

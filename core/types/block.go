@@ -105,9 +105,20 @@ type Header struct {
 
 	// RequestsHash was added by EIP-7685 and is ignored in legacy headers.
 	RequestsHash *common.Hash `json:"requestsRoot" rlp:"optional"`
+
+	//[rollup-geth] EIP-7706 required fields
+	GasLimits     VectorGasLimit `json:"gasLimits" rlp:"optional"`
+	GasUsedVector VectorGasLimit `json:"gasUsedVector" rlp:"optional"`
+	ExcessGas     VectorGasLimit `json:"excessGas" rlp:"optional"`
+
+	//NOTE: [rollup-geth] per EIP-7706 this field is not actually part of block header
+	//Not having this field as part of header would require even bigger code refactor
+	//thus, for time being I'm leaving this here and I want to double check if BaseFees where omitted deliberately
+	BaseFees VectorFeeBigint `rlp:"-" json:"-"`
 }
 
 // field type overrides for gencodec
+// TODO: [rollup-geth] add EIP-7706 fields here
 type headerMarshaling struct {
 	Difficulty    *hexutil.Big
 	Number        *hexutil.Big
@@ -160,6 +171,7 @@ func (h *Header) SanityCheck() error {
 			return fmt.Errorf("too large base fee: bitlen %d", bfLen)
 		}
 	}
+
 	return nil
 }
 
@@ -176,6 +188,14 @@ func (h *Header) EmptyBody() bool {
 // EmptyReceipts returns true if there are no receipts for this header/block.
 func (h *Header) EmptyReceipts() bool {
 	return h.ReceiptHash == EmptyReceiptsHash
+}
+
+// TODO: [rollup-geth] Do we need BaseFees() as well?
+func (h *Header) GetBaseFee() *big.Int {
+	if h.BaseFee == nil {
+		return nil
+	}
+	return new(big.Int).Set(h.BaseFee)
 }
 
 // Body is a simple (mutable, non-safe) data container for storing and moving
@@ -338,6 +358,16 @@ func CopyHeader(h *Header) *Header {
 		cpy.RequestsHash = new(common.Hash)
 		*cpy.RequestsHash = *h.RequestsHash
 	}
+
+	//[rollup-geth] EIP-7706
+	if h.BaseFees != nil {
+		cpy.BaseFees = h.BaseFees.VectorCopy()
+	}
+
+	cpy.GasLimits = h.GasLimits
+	cpy.ExcessGas = h.ExcessGas
+	cpy.GasUsedVector = h.GasUsedVector
+
 	return &cpy
 }
 
@@ -412,6 +442,7 @@ func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
 func (b *Block) UncleHash() common.Hash   { return b.header.UncleHash }
 func (b *Block) Extra() []byte            { return common.CopyBytes(b.header.Extra) }
 
+// TODO: [rollup-geth] Do we need BaseFees() as well?
 func (b *Block) BaseFee() *big.Int {
 	if b.header.BaseFee == nil {
 		return nil

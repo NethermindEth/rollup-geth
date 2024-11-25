@@ -51,6 +51,9 @@ type Config struct {
 
 	State     *state.StateDB
 	GetHashFn func(n uint64) common.Hash
+
+	//[rollup-geth] EIP-7706
+	BaseFees types.VectorFeeBigint
 }
 
 // sets defaults on the config
@@ -107,8 +110,13 @@ func setDefaults(cfg *Config) {
 		cfg.BaseFee = big.NewInt(params.InitialBaseFee)
 	}
 	if cfg.BlobBaseFee == nil {
-		cfg.BlobBaseFee = big.NewInt(params.BlobTxMinBlobGasprice)
+		cfg.BlobBaseFee = big.NewInt(params.TxMinGasPrice)
 	}
+
+	if cfg.BaseFees.VectorAllNil() {
+		cfg.BaseFees = types.VectorFeeBigint{big.NewInt(params.InitialBaseFee), big.NewInt(params.TxMinGasPrice), big.NewInt(params.TxMinGasPrice)}
+	}
+
 	// Merge indicators
 	if t := cfg.ChainConfig.ShanghaiTime; cfg.ChainConfig.TerminalTotalDifficultyPassed || (t != nil && *t == 0) {
 		cfg.Random = &(common.Hash{})

@@ -40,6 +40,9 @@ func NewEnv(cfg *Config) *vm.EVM {
 		BaseFee:     cfg.BaseFee,
 		BlobBaseFee: cfg.BlobBaseFee,
 		Random:      cfg.Random,
+
+		//[rollup-geth] EIP-7706
+		BaseFees: cfg.BaseFees,
 	}
 
 	return vm.NewEVM(blockContext, txContext, cfg.State, cfg.ChainConfig, cfg.EVMConfig)

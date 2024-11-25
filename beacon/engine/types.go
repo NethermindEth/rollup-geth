@@ -78,9 +78,12 @@ type ExecutableData struct {
 	ExcessBlobGas    *uint64                 `json:"excessBlobGas"`
 	Deposits         types.Deposits          `json:"depositRequests"`
 	ExecutionWitness *types.ExecutionWitness `json:"executionWitness,omitempty"`
+
+	//TODO:: [rollup-geth] Add EIP-7706 specific fields
 }
 
 // JSON type overrides for executableData.
+// TODO:: [rollup-geth] Add EIP-7706 specific fields
 type executableDataMarshaling struct {
 	Number        hexutil.Uint64
 	GasLimit      hexutil.Uint64
@@ -218,6 +221,7 @@ func ExecutableDataToBlock(data ExecutableData, versionedHashes []common.Hash, b
 	return block, nil
 }
 
+// TODO: [rollup-geth] Add EIP-7706 fields
 // ExecutableDataToBlockNoHash is analogous to ExecutableDataToBlock, but is used
 // for stateless execution, so it skips checking if the executable data hashes to
 // the requested hash (stateless has to *compute* the root hash, it's not given).
@@ -297,6 +301,7 @@ func ExecutableDataToBlockNoHash(data ExecutableData, versionedHashes []common.H
 		nil
 }
 
+// TODO: [rollup-geth] Add EIP-7706 fields
 // BlockToExecutableData constructs the ExecutableData structure by filling the
 // fields from the given block. It assumes the given block is post-merge block.
 func BlockToExecutableData(block *types.Block, fees *big.Int, sidecars []*types.BlobTxSidecar) *ExecutionPayloadEnvelope {

@@ -343,6 +343,9 @@ type ChainConfig struct {
 	// Various consensus engines
 	Ethash *EthashConfig `json:"ethash,omitempty"`
 	Clique *CliqueConfig `json:"clique,omitempty"`
+
+	//[rollup-geth] specific config
+	EIP7706Time *uint64 `json:"eip7706Time,omitempty"` // EIP-7706 (vector fees), switch tim e(nil = no fork, 0 already activated)
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
@@ -559,11 +562,6 @@ func (c *ChainConfig) IsVerkle(num *big.Int, time uint64) bool {
 // IsEIP4762 returns whether eip 4762 has been activated at given block.
 func (c *ChainConfig) IsEIP4762(num *big.Int, time uint64) bool {
 	return c.IsVerkle(num, time)
-}
-
-// [rollup-geth]
-func (c *ChainConfig) IsR0() bool {
-	return true
 }
 
 // CheckCompatible checks whether scheduled fork transitions have been imported
@@ -899,7 +897,9 @@ type Rules struct {
 	IsBerlin, IsLondon                                      bool
 	IsMerge, IsShanghai, IsCancun, IsPrague                 bool
 	IsVerkle                                                bool
-	IsR0                                                    bool // [rollup-geth]
+
+	//[rollup-geth]
+	IsEIP7706 bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -911,6 +911,7 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 	// disallow setting Merge out of order
 	isMerge = isMerge && c.IsLondon(num)
 	isVerkle := isMerge && c.IsVerkle(num, timestamp)
+
 	return Rules{
 		ChainID:          new(big.Int).Set(chainID),
 		IsHomestead:      c.IsHomestead(num),
@@ -930,6 +931,8 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsPrague:         isMerge && c.IsPrague(num, timestamp),
 		IsVerkle:         isVerkle,
 		IsEIP4762:        isVerkle,
-		IsR0:             true, // [rollup-geth]
+
+		//[rollup-geth]
+		IsEIP7706: c.IsEIP7706(num, timestamp),
 	}
 }
