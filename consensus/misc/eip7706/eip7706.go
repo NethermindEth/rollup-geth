@@ -92,7 +92,7 @@ func SanitizeEIP7706Fields(header *types.Header) (types.VectorGasLimit, types.Ve
 }
 
 // CalcBaseFeesFromParentHeader calculates base fees per EIP-7706 given parent header
-func CalcBaseFeesFromParentHeader(config *params.ChainConfig, parent *types.Header) (*types.VectorFeeBigint, error) {
+func CalcBaseFeesFromParentHeader(config *params.ChainConfig, parent *types.Header) (types.VectorFeeBigint, error) {
 	if parent == nil {
 		return nil, errors.New("parent header is nil")
 	}
@@ -105,9 +105,7 @@ func CalcBaseFeesFromParentHeader(config *params.ChainConfig, parent *types.Head
 		return nil, err
 	}
 
-	baseFees := CalcBaseFees(parent.ExcessGas, parent.GasLimits)
-
-	return &baseFees, nil
+	return CalcBaseFees(parent.ExcessGas, parent.GasLimits), nil
 }
 
 // CalcBaseFees  calculates vector of the base fees for current block header given parent excess gas and targets
