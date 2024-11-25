@@ -40,6 +40,9 @@ type sigCache struct {
 func MakeSigner(config *params.ChainConfig, blockNumber *big.Int, blockTime uint64) Signer {
 	var signer Signer
 	switch {
+	//[rollup-geth] EIP-7706
+	case config.EIP7706Time != nil:
+		signer = NewEIP7706Signer(config.ChainID)
 	case config.IsCancun(blockNumber, blockTime):
 		signer = NewCancunSigner(config.ChainID)
 	case config.IsLondon(blockNumber):

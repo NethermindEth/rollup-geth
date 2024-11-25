@@ -245,3 +245,12 @@ func (vec VectorGasLimit) VectorSubtractClampAtZero(other VectorGasLimit) Vector
 	}
 	return result
 }
+
+// ToVectorBigInt converts a VectorFeeUint to VectorFeeBigint.
+func (vec VectorFeeUint) ToVectorBigInt() VectorFeeBigint {
+	result := make(VectorFeeBigint, VectorFeeTypesCount)
+	for i, v := range vec {
+		result[i] = v.ToBig()
+	}
+	return result
+}
