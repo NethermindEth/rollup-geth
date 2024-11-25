@@ -36,6 +36,12 @@ func (e ExecutableData) MarshalJSON() ([]byte, error) {
 		ExcessBlobGas    *hexutil.Uint64         `json:"excessBlobGas"`
 		Deposits         types.Deposits          `json:"depositRequests"`
 		ExecutionWitness *types.ExecutionWitness `json:"executionWitness,omitempty"`
+
+		// [rollup-geth] Add EIP-7706 specific fields
+		//TODO: use vector of hexutil.Uint64
+		GasLimits     types.VectorGasLimit `json:"gasLimits,omitempty"`
+		GasUsedVector types.VectorGasLimit `json:"gasUsedVector,omitempty"`
+		ExcessGas     types.VectorGasLimit `json:"excessGas,omitempty"`
 	}
 	var enc ExecutableData
 	enc.ParentHash = e.ParentHash
@@ -62,6 +68,11 @@ func (e ExecutableData) MarshalJSON() ([]byte, error) {
 	enc.ExcessBlobGas = (*hexutil.Uint64)(e.ExcessBlobGas)
 	enc.Deposits = e.Deposits
 	enc.ExecutionWitness = e.ExecutionWitness
+
+	// [rollup-geth] Add EIP-7706 specific fields
+	enc.GasLimits = e.GasLimits
+	enc.GasUsedVector = e.GasUsedVector
+	enc.ExcessGas = e.ExcessGas
 	return json.Marshal(&enc)
 }
 
@@ -87,6 +98,12 @@ func (e *ExecutableData) UnmarshalJSON(input []byte) error {
 		ExcessBlobGas    *hexutil.Uint64         `json:"excessBlobGas"`
 		Deposits         *types.Deposits         `json:"depositRequests"`
 		ExecutionWitness *types.ExecutionWitness `json:"executionWitness,omitempty"`
+
+		// [rollup-geth] Add EIP-7706 specific fields
+		//TODO: use vector of hexutil.Uint64
+		GasLimits     types.VectorGasLimit `json:"gasLimits,omitempty"`
+		GasUsedVector types.VectorGasLimit `json:"gasUsedVector,omitempty"`
+		ExcessGas     types.VectorGasLimit `json:"excessGas,omitempty"`
 	}
 	var dec ExecutableData
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -166,5 +183,10 @@ func (e *ExecutableData) UnmarshalJSON(input []byte) error {
 	if dec.ExecutionWitness != nil {
 		e.ExecutionWitness = dec.ExecutionWitness
 	}
+
+	//[rollup-geth] Add EIP-7706 specific fields
+	e.ExcessGas = dec.ExcessGas
+	e.GasUsedVector = dec.GasUsedVector
+	e.GasLimits = dec.GasLimits
 	return nil
 }
