@@ -24,10 +24,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // TxStatus is the current status of a transaction as seen by the pool.
@@ -57,6 +59,18 @@ type BlockChain interface {
 
 	// SubscribeChainHeadEvent subscribes to new blocks being added to the chain.
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
+
+	// StateAt returns a state database for a given root hash (generally the head).
+	// [rollup-geth] EIP-7706
+	StateAt(root common.Hash) (*state.StateDB, error)
+
+	// Config retrieves the chain's fork configuration.
+	// [rollup-geth] EIP-7706
+	Config() *params.ChainConfig
+
+	// GetBlock retrieves a specific block, used during pool resets.
+	// [rollup-geth] EIP-7706
+	GetBlock(hash common.Hash, number uint64) *types.Block
 }
 
 // TxPool is an aggregator for various transaction specific pools, collectively

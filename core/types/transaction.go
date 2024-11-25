@@ -299,13 +299,34 @@ func (tx *Transaction) AccessList() AccessList { return tx.inner.accessList() }
 func (tx *Transaction) Gas() uint64 { return tx.inner.gas() }
 
 // GasPrice returns the gas price of the transaction.
-func (tx *Transaction) GasPrice() *big.Int { return new(big.Int).Set(tx.inner.gasPrice()) }
+func (tx *Transaction) GasPrice() *big.Int {
+	// Modified by [rollup-geth] EIP-7706 tx_vector_fee returns nil for gasPrice()
+	// So we need to take care of this edge-case
+	if gasPrice := tx.inner.gasPrice(); gasPrice != nil {
+		return new(big.Int).Set(tx.inner.gasPrice())
+	}
+	return nil
+}
 
 // GasTipCap returns the gasTipCap per gas of the transaction.
-func (tx *Transaction) GasTipCap() *big.Int { return new(big.Int).Set(tx.inner.gasTipCap()) }
+func (tx *Transaction) GasTipCap() *big.Int {
+	// Modified by [rollup-geth] EIP-7706 tx_vector_fee returns nil for gasTipCap()
+	// So we need to take care of this edge-case
+	if gasTipCap := tx.inner.gasTipCap(); gasTipCap != nil {
+		return new(big.Int).Set(tx.inner.gasTipCap())
+	}
+	return nil
+}
 
 // GasFeeCap returns the fee cap per gas of the transaction.
-func (tx *Transaction) GasFeeCap() *big.Int { return new(big.Int).Set(tx.inner.gasFeeCap()) }
+func (tx *Transaction) GasFeeCap() *big.Int {
+	// Modified by [rollup-geth] EIP-7706 tx_vector_fee returns nil for gasFeeCap()
+	// So we need to take care of this edge-case
+	if gasFeeCap := tx.inner.gasFeeCap(); gasFeeCap != nil {
+		return new(big.Int).Set(tx.inner.gasFeeCap())
+	}
+	return nil
+}
 
 // Value returns the ether amount of the transaction.
 func (tx *Transaction) Value() *big.Int { return new(big.Int).Set(tx.inner.value()) }
@@ -393,6 +414,8 @@ func (tx *Transaction) EffectiveGasTipIntCmp(other *big.Int, baseFee *big.Int) i
 	}
 	return tx.EffectiveGasTipValue(baseFee).Cmp(other)
 }
+
+//TODO: [rollup-geth] VectorFee transactions can also contain blobs
 
 // BlobGas returns the blob gas limit of the transaction for blob transactions, 0 otherwise.
 func (tx *Transaction) BlobGas() uint64 {

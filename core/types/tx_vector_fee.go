@@ -35,7 +35,7 @@ type VectorFeeTx struct {
 }
 
 // accessors for innerTx. (satisfies TxData Interface)
-func (tx *VectorFeeTx) txType() byte           { return DynamicFeeTxType }
+func (tx *VectorFeeTx) txType() byte           { return VectorFeeTxType }
 func (tx *VectorFeeTx) chainID() *big.Int      { return tx.ChainID.ToBig() }
 func (tx *VectorFeeTx) accessList() AccessList { return tx.AccessList }
 func (tx *VectorFeeTx) data() []byte           { return tx.Data }
@@ -133,11 +133,11 @@ func (tx *VectorFeeTx) copy() TxData {
 	}
 
 	for i, v := range tx.GasTipCaps {
-		cpy.GasTipCaps[i].Set(v)
+		cpy.GasTipCaps[i] = new(uint256.Int).Set(v)
 	}
 
 	for i, v := range tx.GasFeeCaps {
-		cpy.GasFeeCaps[i].Set(v)
+		cpy.GasFeeCaps[i] = new(uint256.Int).Set(v)
 	}
 
 	if tx.V != nil {
