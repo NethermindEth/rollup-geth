@@ -57,8 +57,8 @@ type txJSON struct {
 	Hash common.Hash `json:"hash"`
 
 	//[rollup-geth] EIP-7706
-	GasTipCaps VectorFeeBigint `json:"gasTipCaps"`
-	GasFeeCaps VectorFeeBigint `json:"gasFeeCaps"`
+	GasTipCaps VectorFeeBigint `json:"gasTipCaps,omitempty"`
+	GasFeeCaps VectorFeeBigint `json:"gasFeeCaps,omitempty"`
 }
 
 // yParityValue returns the YParity value from JSON. For backwards-compatibility reasons,
