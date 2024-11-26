@@ -1469,8 +1469,8 @@ type RPCTransaction struct {
 	YParity             *hexutil.Uint64   `json:"yParity,omitempty"`
 
 	//[rollup-geth] EIP-7706
-	GasTipCaps types.VectorFeeBigint `json:"gasTipCaps"`
-	GasFeeCaps types.VectorFeeBigint `json:"gasFeeCaps"`
+	GasTipCaps types.VectorFeeBigint `json:"gasTipCaps,omitempty"`
+	GasFeeCaps types.VectorFeeBigint `json:"gasFeeCaps,omitempty"`
 }
 
 // newRPCTransaction returns a transaction that will serialize to the RPC
