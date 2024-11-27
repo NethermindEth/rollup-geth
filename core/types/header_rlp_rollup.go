@@ -209,6 +209,9 @@ func (h *Header) DecodeRLP(s *rlp.Stream) error {
 
 	// assume not EIP-7706
 	isEIP7706 := false
+
+	//If the decoding of GasUsed fails, this means that this is EIP-7706
+	//Because instead of `GasUSed` this filed was actually `h.Extra`
 	if err := s.Decode(&h.GasUsed); err != nil {
 		isEIP7706 = true
 	}
@@ -223,12 +226,9 @@ func (h *Header) DecodeRLP(s *rlp.Stream) error {
 		}
 	}
 
-	var extra = make([]byte, 0)
-	if err := s.Decode(&extra); err != nil {
+	if err := s.Decode(&h.Extra); err != nil {
 		return err
 	}
-
-	h.Extra = extra
 
 	if err := s.Decode(&h.MixDigest); err != nil {
 		return err
