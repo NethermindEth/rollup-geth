@@ -98,6 +98,12 @@ type executableDataMarshaling struct {
 	Transactions  []hexutil.Bytes
 	BlobGasUsed   *hexutil.Uint64
 	ExcessBlobGas *hexutil.Uint64
+
+	//[rollup-geth] Add EIP-7706 specific fields
+	//TODO: use vector of hexutil.Uint64
+	GasLimits     types.VectorGasLimit
+	GasUsedVector types.VectorGasLimit
+	ExcessGas     types.VectorGasLimit
 }
 
 // StatelessPayloadStatusV1 is the result of a stateless payload execution.

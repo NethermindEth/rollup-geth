@@ -258,9 +258,26 @@ func (st *StateTransition) preCheckGasEIP7706() error {
 	if !msg.GasTipCaps.VectorAllLessOrEqual(msg.GasFeeCaps) {
 		return fmt.Errorf("EIP-7706: %w: address %v", ErrTipAboveFeeCap, msg.From.Hex())
 	}
-	if !st.evm.Context.BaseFees.VectorAllLessOrEqual(msg.GasFeeCaps) {
-		return fmt.Errorf("EIP-7706: %w: address %v", ErrFeeCapTooLow, msg.From.Hex())
-	}
+
+	//NOTE: I have commented this out, initially I have had this check because we do the similar checks in the preCheckGasEIP4484
+	// i.e. we make sure that gas fee cap (and blob gas fee cap) >=  base fee (blob base fee).
+	// The issue here is, that per EIP-7706 if we send eg. LegacyTx the vector fee is defined as follows: [tx.gasprice, 0, tx.gasprice]
+	// As you can see blob fee is 0 (which make sense because there are no blobs)
+	// The problem is that header BaseFees will never return 0 for any of the gas types (per EIP-7706).
+	// The  minimal base fee for gas type is defined in  params/protocol_params_rollup.go|TxMinGasPrice and is currently  1
+	// So you can see how this fails ([1, 1, 1,] is not "all less or eq than" [tx.gasprice, 0, tx.gasprice] )
+	// Moreover this check IS NOT part of EIP-7706 spec (from the spec):
+	// At the start of processing a transaction:
+	// Compute fees_per_gas = get_fees_per_gas(tx, get_block_basefees(block)) and tx_gaslimits = get_gaslimits(tx)
+	// Check that all_less_or_equal(vector_add(gas_used_so_far, tx_gaslimits), block.gas_limits)
+	// Deduct sum(vector_mul(fees_per_gas, tx_gaslimits)) wei from the tx.origin account
+	// As you can see there is no requirement that:  BaseFees.VectorAllLessOrEqual(msg.GasFeeCaps)
+
+	// NB: even this is "dead code" and I'd prefer simply deleting it, IMHO, it's easy to re-introduce this bug and it could be tricky to spot it
+
+	// if !st.evm.Context.BaseFees.VectorAllLessOrEqual(msg.GasFeeCaps) {
+	// 	return fmt.Errorf("EIP-7706: %w: address %v, baseFees: %s, maxFeePerGas: %s", ErrFeeCapTooLow, msg.From.Hex(), st.evm.Context.BaseFees, msg.GasFeeCaps)
+	// }
 
 	return nil
 }
@@ -383,4 +400,18 @@ func (st *StateTransition) vectorGasRemaining() types.VectorGasLimit {
 	//NOTE: 2 msg.GasLimits[0] == msg.GasLimit == st.initialGas
 	// this is why this holds
 	return st.msg.GasLimits.VectorSubtractClampAtZero(st.vectorGasUsed())
+}
+
+func NewExecutionResult(usedGas, gasRefund uint64, usedGasVector types.VectorGasLimit, returnData []byte, vmErr error) *ExecutionResult {
+	e := ExecutionResult{
+		UsedGas:     usedGas,
+		RefundedGas: gasRefund,
+		Err:         vmErr,
+		ReturnData:  returnData,
+
+		//[rollup-geth] EIP-7706
+		UsedGasVector: usedGasVector,
+	}
+
+	return &e
 }

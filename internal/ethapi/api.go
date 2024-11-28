@@ -1467,6 +1467,10 @@ type RPCTransaction struct {
 	R                   *hexutil.Big      `json:"r"`
 	S                   *hexutil.Big      `json:"s"`
 	YParity             *hexutil.Uint64   `json:"yParity,omitempty"`
+
+	//[rollup-geth] EIP-7706
+	GasTipCaps types.VectorFeeBigint `json:"gasTipCaps,omitempty"`
+	GasFeeCaps types.VectorFeeBigint `json:"gasFeeCaps,omitempty"`
 }
 
 // newRPCTransaction returns a transaction that will serialize to the RPC
@@ -1540,6 +1544,18 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 			result.GasPrice = (*hexutil.Big)(tx.GasFeeCap())
 		}
 		result.MaxFeePerBlobGas = (*hexutil.Big)(tx.BlobGasFeeCap())
+		result.BlobVersionedHashes = tx.BlobHashes()
+
+	case types.VectorFeeTxType:
+		al := tx.AccessList()
+		yparity := hexutil.Uint64(v.Sign())
+		result.Accesses = &al
+		result.ChainID = (*hexutil.Big)(tx.ChainId())
+		result.YParity = &yparity
+		result.BlobVersionedHashes = tx.BlobHashes()
+		result.GasFeeCaps = tx.GasFeeCaps()
+		result.GasTipCaps = tx.GasTipCaps()
+
 		result.BlobVersionedHashes = tx.BlobHashes()
 	}
 	return result

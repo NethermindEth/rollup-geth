@@ -403,16 +403,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		return nil, err
 	}
 
-	return &ExecutionResult{
-		// TODO: this should be vector [execution_gas, blobl_gas, calldata_gas]
-		UsedGas:     st.gasUsed(),
-		RefundedGas: gasRefund,
-		Err:         vmerr,
-		ReturnData:  ret,
-
-		//[rollup-geth] EIP-7706
-		UsedGasVector: st.vectorGasUsed(),
-	}, nil
+	//[rollup-geth]
+	return NewExecutionResult(st.gasUsed(), gasRefund, st.vectorGasUsed(), ret, vmerr), nil
 }
 
 func (st *StateTransition) refundGas(refundQuotient uint64) (uint64, error) {
