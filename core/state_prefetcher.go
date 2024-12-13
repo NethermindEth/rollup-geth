@@ -59,8 +59,9 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, c
 		if interrupt != nil && interrupt.Load() {
 			return
 		}
+		//[rollup-geth] EIP-7706
 		// Convert the transaction into an executable message and pre-cache its sender
-		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
+		msg, err := TransactionToMessage(tx, signer, header, p.config)
 		if err != nil {
 			return // Also invalid block, bail out
 		}

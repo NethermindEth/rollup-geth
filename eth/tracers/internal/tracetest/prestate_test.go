@@ -104,7 +104,8 @@ func testPrestateDiffTracer(tracerName string, dirPath string, t *testing.T) {
 			}
 
 			state.StateDB.SetLogger(tracer.Hooks)
-			msg, err := core.TransactionToMessage(tx, signer, context.BaseFee)
+			//[rollup-geth] EIP-7706
+			msg, err := core.TransactionToMessageEIP4844(tx, signer, context.BaseFee)
 			if err != nil {
 				t.Fatalf("failed to prepare transaction for tracing: %v", err)
 			}

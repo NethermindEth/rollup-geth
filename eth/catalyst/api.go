@@ -873,6 +873,7 @@ func (api *ConsensusAPI) newPayload(params engine.ExecutableData, versionedHashe
 	if parent == nil {
 		return api.delayPayloadImport(block), nil
 	}
+
 	// We have an existing parent, do some sanity checks to avoid the beacon client
 	// triggering too early
 	var (

@@ -529,6 +529,12 @@ func (pool *LegacyPool) Pending(filter txpool.PendingFilter) map[common.Address]
 	if filter.OnlyBlobTxs {
 		return nil
 	}
+
+	//[rollup-geth] EIP-7706
+	if filter.OnlyVectorFeeTxs {
+		return nil
+	}
+
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
@@ -1298,6 +1304,7 @@ func (pool *LegacyPool) runReorg(done chan struct{}, reset *txpoolResetRequest, 
 	if reset != nil {
 		pool.demoteUnexecutables()
 		if reset.newHead != nil {
+			//TODO:[rollup-geth] what about EIP-7706 base fees?
 			if pool.chainconfig.IsLondon(new(big.Int).Add(reset.newHead.Number, big.NewInt(1))) {
 				pendingBaseFee := eip1559.CalcBaseFee(pool.chainconfig, reset.newHead)
 				pool.priced.SetBaseFee(pendingBaseFee)

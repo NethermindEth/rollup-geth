@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip7706"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
@@ -1778,6 +1779,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks, setHead bool, makeWitness 
 		}
 		statedb.SetLogger(bc.logger)
 
+		//[rollup-geth] EIP-7706
+		setBaseFeesForBlock(block, parent, bc.chainConfig)
+
 		// If we are past Byzantium, enable prefetching to pull in trie node paths
 		// while processing transactions. Before Byzantium the prefetcher is mostly
 		// useless due to the intermediate root hashing after each transaction.
@@ -2157,6 +2161,7 @@ func (bc *BlockChain) recoverAncestors(block *types.Block, makeWitness bool) (co
 	return block.Hash(), nil
 }
 
+// TODO: [rollup-geth] how do we handle VectorGasPrice
 // collectLogs collects the logs that were generated or removed during
 // the processing of a block. These logs are later announced as deleted or reborn.
 func (bc *BlockChain) collectLogs(b *types.Block, removed bool) []*types.Log {
@@ -2536,4 +2541,20 @@ func (bc *BlockChain) SetTrieFlushInterval(interval time.Duration) {
 // GetTrieFlushInterval gets the in-memory tries flushAlloc interval
 func (bc *BlockChain) GetTrieFlushInterval() time.Duration {
 	return time.Duration(bc.flushInterval.Load())
+}
+
+// [rollup-geth] EIP-7706
+func setBaseFeesForBlock(block *types.Block, parent *types.Header, chainConfig *params.ChainConfig) {
+	if baseFeesAlreadySet := block.BaseFees() != nil; baseFeesAlreadySet {
+		return
+	}
+
+	if notEIP7706Block := !chainConfig.IsEIP7706(block.Header().Number, block.Header().Time); notEIP7706Block {
+		return
+	}
+
+	baseFees, err := eip7706.CalcBaseFeesFromParentHeader(chainConfig, parent)
+	if err == nil {
+		block.SetBaseFees(baseFees)
+	}
 }

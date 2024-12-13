@@ -382,6 +382,8 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		Time:       parent.Time() + 10,
 		UncleHash:  types.EmptyUncleHash,
 	}
+
+	//TODO: [rollup-geth] if calc EIP-7706 base fees
 	if config.IsLondon(header.Number) {
 		header.BaseFee = eip1559.CalcBaseFee(config, parent.Header())
 	}

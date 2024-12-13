@@ -78,9 +78,15 @@ type ExecutableData struct {
 	ExcessBlobGas    *uint64                 `json:"excessBlobGas"`
 	Deposits         types.Deposits          `json:"depositRequests"`
 	ExecutionWitness *types.ExecutionWitness `json:"executionWitness,omitempty"`
+
+	//[rollup-geth] Add EIP-7706 specific fields
+	GasLimits     types.VectorGasLimit `json:"gasLimits,omitempty"`
+	GasUsedVector types.VectorGasLimit `json:"gasUsedVector,omitempty"`
+	ExcessGas     types.VectorGasLimit `json:"excessGas,omitempty"`
 }
 
 // JSON type overrides for executableData.
+// TODO:: [rollup-geth] Add EIP-7706 specific fields
 type executableDataMarshaling struct {
 	Number        hexutil.Uint64
 	GasLimit      hexutil.Uint64
@@ -290,6 +296,11 @@ func ExecutableDataToBlockNoHash(data ExecutableData, versionedHashes []common.H
 		BlobGasUsed:      data.BlobGasUsed,
 		ParentBeaconRoot: beaconRoot,
 		RequestsHash:     requestsHash,
+
+		//[rollup-geth] EIP-7706 fields
+		GasLimits:     data.GasLimits,
+		GasUsedVector: data.GasUsedVector,
+		ExcessGas:     data.ExcessGas,
 	}
 	return types.NewBlockWithHeader(header).
 			WithBody(types.Body{Transactions: txs, Uncles: nil, Withdrawals: data.Withdrawals, Requests: requests}).
@@ -319,6 +330,11 @@ func BlockToExecutableData(block *types.Block, fees *big.Int, sidecars []*types.
 		BlobGasUsed:      block.BlobGasUsed(),
 		ExcessBlobGas:    block.ExcessBlobGas(),
 		ExecutionWitness: block.ExecutionWitness(),
+
+		//[rollup-geth] EIP-7706 fields
+		GasLimits:     block.Header().GasLimits,
+		GasUsedVector: block.Header().GasUsedVector,
+		ExcessGas:     block.Header().ExcessGas,
 	}
 	bundle := BlobsBundleV1{
 		Commitments: make([]hexutil.Bytes, 0),

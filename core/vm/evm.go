@@ -65,16 +65,22 @@ type BlockContext struct {
 	BaseFee     *big.Int       // Provides information for BASEFEE (0 if vm runs with NoBaseFee flag and 0 gas price)
 	BlobBaseFee *big.Int       // Provides information for BLOBBASEFEE (0 if vm runs with NoBaseFee flag and 0 blob gas price)
 	Random      *common.Hash   // Provides information for PREVRANDAO
+
+	//[rollup-geth] EIP-7706
+	BaseFees types.VectorFeeBigint
 }
 
 // TxContext provides the EVM with information about a transaction.
 // All fields can change between transactions.
 type TxContext struct {
 	// Message information
-	Origin       common.Address      // Provides information for ORIGIN
-	GasPrice     *big.Int            // Provides information for GASPRICE (and is used to zero the basefee if NoBaseFee is set)
-	BlobHashes   []common.Hash       // Provides information for BLOBHASH
-	BlobFeeCap   *big.Int            // Is used to zero the blobbasefee if NoBaseFee is set
+	Origin     common.Address // Provides information for ORIGIN
+	GasPrice   *big.Int       // Provides information for GASPRICE (and is used to zero the basefee if NoBaseFee is set)
+	BlobHashes []common.Hash  // Provides information for BLOBHASH
+	// Is used to zero the blobbasefee if NoBaseFee is set
+	//NOTE: [rollup-geth] as far as I can see  this zeroing out is only done in gasestimator/gasestimator.go
+	//TODO: [rollup-geth] EIP-7706 do we need to zero-out vector of FeeCaps?
+	BlobFeeCap   *big.Int
 	AccessEvents *state.AccessEvents // Capture all state accesses for this tx
 }
 
