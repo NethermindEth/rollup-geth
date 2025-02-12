@@ -323,6 +323,26 @@ func enable6780(jt *JumpTable) {
 	}
 }
 
+// opIsStatic implements the ISSTATIC opcode
+func opIsStatic(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if interpreter.readOnly {
+		scope.Stack.push(uint256.NewInt(1))
+	} else {
+		scope.Stack.push(uint256.NewInt(0))
+	}
+	return nil, nil
+}
+
+// enable2970 applies EIP-2970 (ISSTATIC opcode)  https://eips.ethereum.org/EIPS/eip-2970
+func enable2970(jt *JumpTable) {
+	jt[ISSTATIC] = &operation{
+		execute:     opIsStatic,
+		constantGas: GasQuickStep,
+		minStack:    minStack(0, 1),
+		maxStack:    maxStack(0, 1),
+	}
+}
+
 func opExtCodeCopyEIP4762(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	var (
 		stack      = scope.Stack

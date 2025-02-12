@@ -18,8 +18,10 @@ package vm
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"math/big"
 	"os"
 	"strings"
@@ -926,4 +928,59 @@ func TestOpMCopy(t *testing.T) {
 			t.Errorf("case %d: gas wrong, want %d have %d\n", i, wantGas, haveGas)
 		}
 	}
+}
+
+func TestOpIsStatic(t *testing.T) {
+	//function getDouble(uint256 x) public pure returns (uint256) {
+	//	return x * 2, isstatic();
+	//}
+	// EVM mnemonics and their bytecodes respectively of the Solidity function above; note that
+	// isstatic() isn't actually recognizable by Solidity and is a custom opcode that is being tested with this testcase.
+	var getDoubleOpcodes = [][2]string{
+		{"PUSH1 0x00", "6000"},
+		{"CALLDATALOAD", "35"},
+		{"PUSH1 0x02", "6002"},
+		{"MUL", "02"},
+		{"PUSH1 0x00", "6000"},
+		{"MSTORE", "52"},
+		{"ISSTATIC", "4B"}, // This is the new ISSTATIC opcode: https://eips.ethereum.org/EIPS/eip-2970
+		{"PUSH1 0x20", "6020"},
+		{"MSTORE", "52"},
+		{"PUSH1 0x40", "6040"},
+		{"PUSH1 0x00", "6000"},
+		{"RETURN", "F3"},
+	}
+	var bs strings.Builder
+	for _, op := range getDoubleOpcodes {
+		bs.WriteString(op[1])
+	}
+	bytecode, err := hex.DecodeString(bs.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		env            = NewEVM(BlockContext{BlockNumber: big.NewInt(1), Random: &common.Hash{}, Time: 1}, TxContext{}, nil, params.MergedTestChainConfig, Config{})
+		evmInterpreter = env.interpreter
+	)
+
+	// Create a new contract with 'getDouble' function
+	contract := NewContract(contractRef{common.Address{}}, AccountRef(common.Address{1}), uint256.NewInt(0), 100000)
+	contract.Code = bytecode
+
+	// Input is 5
+	input := make([]byte, 32)
+	input[31] = 5
+
+	// Run the contract with 'readOnly' set to true, imitating STATICCALL
+	resultData, err := evmInterpreter.Run(contract, input, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doubledValue := new(uint256.Int).SetBytes(resultData[:32])
+	isStaticValue := new(uint256.Int).SetBytes(resultData[32:])
+
+	assert.Equal(t, uint256.NewInt(10), doubledValue, "Expected output to be double the input")
+	assert.Equal(t, uint256.NewInt(1), isStaticValue, "Expected ISSTATIC to return true (1)")
 }

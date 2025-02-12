@@ -108,6 +108,7 @@ func newCancunInstructionSet() JumpTable {
 	enable1153(&instructionSet) // EIP-1153 "Transient Storage"
 	enable5656(&instructionSet) // EIP-5656 (MCOPY opcode)
 	enable6780(&instructionSet) // EIP-6780 SELFDESTRUCT only in same transaction
+	enable2970(&instructionSet) // EIP-2970 (ISSTATIC opcode) https://eips.ethereum.org/EIPS/eip-2970
 	return validate(instructionSet)
 }
 
