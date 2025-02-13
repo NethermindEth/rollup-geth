@@ -333,7 +333,7 @@ func opIsStatic(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 	return nil, nil
 }
 
-// enable2970 applies EIP-2970 (ISSTATIC opcode)  https://eips.ethereum.org/EIPS/eip-2970
+// enable2970 applies EIP-2970 (ISSTATIC opcode)
 func enable2970(jt *JumpTable) {
 	jt[ISSTATIC] = &operation{
 		execute:     opIsStatic,

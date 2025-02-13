@@ -104,7 +104,7 @@ const (
 	BASEFEE     OpCode = 0x48
 	BLOBHASH    OpCode = 0x49
 	BLOBBASEFEE OpCode = 0x4a
-	ISSTATIC    OpCode = 0x4b // To determine if the current context is static or not, as described at https://eips.ethereum.org/EIPS/eip-2970
+	ISSTATIC    OpCode = 0x4b // To determine if the current context is static or not, as described at EIP-2970
 )
 
 // 0x50 range - 'storage' and execution.
