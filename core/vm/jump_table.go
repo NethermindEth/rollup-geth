@@ -62,6 +62,7 @@ var (
 	cancunInstructionSet           = newCancunInstructionSet()
 	verkleInstructionSet           = newVerkleInstructionSet()
 	pragueEOFInstructionSet        = newPragueEOFInstructionSet()
+	commonCoreV1InstructionSet     = newCommonCoreV1InstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
@@ -83,6 +84,13 @@ func validate(jt JumpTable) JumpTable {
 		}
 	}
 	return jt
+}
+
+// New instruction sets for common core V1 changes (i.e. the changes that are commonly shared by all L2s)
+func newCommonCoreV1InstructionSet() JumpTable {
+	instructionSet := newCancunInstructionSet()
+	enable2970(&instructionSet) // EIP-2970 (ISSTATIC opcode)
+	return validate(instructionSet)
 }
 
 func newVerkleInstructionSet() JumpTable {
@@ -108,7 +116,6 @@ func newCancunInstructionSet() JumpTable {
 	enable1153(&instructionSet) // EIP-1153 "Transient Storage"
 	enable5656(&instructionSet) // EIP-5656 (MCOPY opcode)
 	enable6780(&instructionSet) // EIP-6780 SELFDESTRUCT only in same transaction
-	enable2970(&instructionSet) // EIP-2970 (ISSTATIC opcode)
 	return validate(instructionSet)
 }
 

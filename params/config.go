@@ -561,6 +561,12 @@ func (c *ChainConfig) IsEIP4762(num *big.Int, time uint64) bool {
 	return c.IsVerkle(num, time)
 }
 
+// IsCommonCoreV1 returns whether time is either equal to the CCV1 fork time or greater.
+func (c *ChainConfig) IsCommonCoreV1(num *big.Int, time uint64) bool {
+	// For simplicity, we check if it is Cancun or later; in real life, we would check for timestamp like the others
+	return c.IsCancun(num, time)
+}
+
 // CheckCompatible checks whether scheduled fork transitions have been imported
 // with a mismatching chain configuration.
 func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64, time uint64) *ConfigCompatError {
@@ -894,6 +900,7 @@ type Rules struct {
 	IsBerlin, IsLondon                                      bool
 	IsMerge, IsShanghai, IsCancun, IsPrague                 bool
 	IsVerkle                                                bool
+	IsCommonCoreV1                                          bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -924,5 +931,6 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsPrague:         isMerge && c.IsPrague(num, timestamp),
 		IsVerkle:         isVerkle,
 		IsEIP4762:        isVerkle,
+		IsCommonCoreV1:   isMerge && c.IsCommonCoreV1(num, timestamp),
 	}
 }
