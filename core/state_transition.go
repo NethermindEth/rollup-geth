@@ -211,13 +211,12 @@ func ApplyMessage(evm *vm.EVM, msg *Message, gp *GasPool) (*ExecutionResult, err
 //  5. Run Script section
 //  6. Derive new state root
 type StateTransition struct {
-	gp             *GasPool
-	msg            *Message
-	gasRemaining   uint64
-	initialGas     uint64
-	state          vm.StateDB
-	evm            *vm.EVM
-	indestructible map[common.Address]struct{}
+	gp           *GasPool
+	msg          *Message
+	gasRemaining uint64
+	initialGas   uint64
+	state        vm.StateDB
+	evm          *vm.EVM
 }
 
 // NewStateTransition initialises and returns a new state transition object.
