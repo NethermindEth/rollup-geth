@@ -114,6 +114,8 @@ type EVM struct {
 	callGasTemp uint64
 	// precompiles holds the precompiled contracts for the current epoch
 	precompiles map[common.Address]PrecompiledContract
+	// indestructibleContracts is a map of contracts that are not destructible
+	indestructibleContracts map[common.Address]struct{}
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should

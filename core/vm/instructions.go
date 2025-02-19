@@ -891,10 +891,22 @@ func opUndefined(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 func opStop(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	return nil, errStopToken
 }
-
+func opSetIndestructible(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	// Add current contract to indestructible set
+	if interpreter.evm.indestructibleContracts == nil {
+		interpreter.evm.indestructibleContracts = make(map[common.Address]struct{})
+	}
+	interpreter.evm.indestructibleContracts[scope.Contract.Address()] = struct{}{}
+	return nil, nil
+}
 func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
+	}
+	// Check if contract is indestructible
+	if _, ok := interpreter.evm.indestructibleContracts[scope.Contract.Address()]; ok {
+		return nil, ErrIndestructibleContract
 	}
 	beneficiary := scope.Stack.pop()
 	balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())

@@ -40,6 +40,7 @@ var activators = map[int]func(*JumpTable){
 	1344: enable1344,
 	1153: enable1153,
 	4762: enable4762,
+	2937: enable2937,
 }
 
 // EnableEIP enables the given EIP on the config.
@@ -701,5 +702,15 @@ func enableEOF(jt *JumpTable) {
 		minStack:    minStack(3, 1),
 		maxStack:    maxStack(3, 1),
 		memorySize:  memoryExtCall,
+	}
+}
+
+// Enable EIP-2937
+func enable2937(jt *JumpTable) {
+	jt[SET_INDESTRUCTIBLE] = &operation{
+		execute:     opSetIndestructible,
+		constantGas: GasQuickStep,   // Using G_base (2 gas) as specified in EIP
+		minStack:    minStack(0, 0), // Takes no args, returns nothing
+		maxStack:    maxStack(0, 0),
 	}
 }
