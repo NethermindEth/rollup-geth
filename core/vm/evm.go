@@ -207,6 +207,22 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 	evm.Context.Transfer(evm.StateDB, caller.Address(), addr, value)
 
+	// Emit log for ETH transfer (EIP-7708)
+	if evm.chainRules.IsEIP7708 && !value.IsZero() {
+		data := value.Bytes32()
+		topics := []common.Hash{
+			common.BytesToHash([]byte{common.MagicTransferLog}),
+			common.BytesToHash(caller.Address().Bytes()),
+			common.BytesToHash(addr.Bytes())}
+
+		evm.StateDB.AddLog(&types.Log{
+			Address:     caller.Address(),
+			Topics:      topics,
+			Data:        data[:],
+			BlockNumber: evm.Context.BlockNumber.Uint64(),
+		})
+	}
+
 	if isPrecompile {
 		ret, gas, err = RunPrecompiledContract(p, input, gas, evm.Config.Tracer)
 	} else {

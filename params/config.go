@@ -561,8 +561,8 @@ func (c *ChainConfig) IsEIP4762(num *big.Int, time uint64) bool {
 	return c.IsVerkle(num, time)
 }
 
-// IsCCv1 returns whether CCv1 has been activated at given block.
-func (c *ChainConfig) IsCCv1(num *big.Int, time uint64) bool {
+// IsCommonCoreV1 returns whether CCv1 has been activated at given block.
+func (c *ChainConfig) IsCommonCoreV1(num *big.Int, time uint64) bool {
 	return true
 }
 
@@ -930,6 +930,6 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsPrague:         isMerge && c.IsPrague(num, timestamp),
 		IsVerkle:         isVerkle,
 		IsEIP4762:        isVerkle,
-		IsEIP7708:        c.IsCCv1(num, timestamp),
+		IsEIP7708:        c.IsCommonCoreV1(num, timestamp),
 	}
 }

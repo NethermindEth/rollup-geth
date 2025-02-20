@@ -31,11 +31,14 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/asm"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/tracers"
 	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/holiman/uint256"
+	"github.com/stretchr/testify/assert"
 
 	// force-load js tracers to trigger registration
 	_ "github.com/ethereum/go-ethereum/eth/tracers/js"
@@ -972,4 +975,98 @@ func BenchmarkTracerStepVsCallFrame(b *testing.B) {
 
 	benchmarkNonModifyingCode(10000000, code, "tracer-step-10M", stepTracer, b)
 	benchmarkNonModifyingCode(10000000, code, "tracer-call-frame-10M", callFrameTracer, b)
+}
+
+func TestEIP7708TransferLogs(t *testing.T) {
+	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
+	assert := assert.New(t)
+	sendToAddr := byte(0xbb)
+	value := byte(0x3)
+	maxValue := uint256.NewInt(20)
+
+	// Create a new contract that makes a call
+	callCode := []byte{
+		byte(vm.PUSH1), 0, // out size
+		byte(vm.PUSH1), 0, // out offset
+		byte(vm.PUSH1), 0, // in size
+		byte(vm.PUSH1), 0, // in offset
+		byte(vm.PUSH1), value, // value = 1
+		byte(vm.PUSH1), sendToAddr, // address
+		byte(vm.GAS),
+		byte(vm.CALL),
+		byte(vm.POP),
+	}
+
+	callAddr := common.HexToAddress("0xaa")
+	statedb.SetCode(callAddr, callCode)
+	statedb.SetBalance(callAddr, maxValue, tracing.BalanceChangeUnspecified)
+
+	cfg := &Config{
+		State: statedb,
+	}
+
+	_, _, err := Call(callAddr, nil, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify the generated log
+	verifyTransferLog(assert, statedb.Logs(), 1, 0,
+		callAddr,           // from address
+		[]byte{sendToAddr}, // to address
+		common.BytesToHash([]byte{value}).Bytes(), // value
+	)
+
+	// Create a new contract that selfdestructs
+	selfDestructAddr := common.HexToAddress("0xbb")
+	suicideCode := []byte{
+		byte(vm.PUSH1), 0xaa, // beneficiary
+		byte(vm.SELFDESTRUCT),
+	}
+	statedb.SetCode(selfDestructAddr, suicideCode)
+	statedb.SetBalance(selfDestructAddr, maxValue, tracing.BalanceChangeUnspecified)
+
+	_, _, err = Call(selfDestructAddr, nil, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify the generated log
+	data := maxValue.Bytes32()
+	verifyTransferLog(assert, statedb.Logs(), 2, 1,
+		selfDestructAddr, // from address
+		[]byte{0xaa},     // to address
+		data[:],          // value
+	)
+
+	// Create a new contract with non-zero value to trigger a transfer log
+	_, contractAddr, _, err := Create(callCode, &Config{
+		State:  statedb,
+		Origin: callAddr,
+		Value:  big.NewInt(int64(value)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify the generated log (generates extra logs due to callCode)
+	verifyTransferLog(assert, statedb.Logs(), 5, 2,
+		callAddr,             // from address
+		contractAddr.Bytes(), // to address
+		common.BytesToHash([]byte{value}).Bytes(), // value
+	)
+}
+
+func verifyTransferLog(assert *assert.Assertions, logs []*types.Log, expectedNumLogs, idx int,
+	fromAddr common.Address, toAddr []byte, value []byte) {
+	topics := []common.Hash{
+		common.BytesToHash([]byte{common.MagicTransferLog}),
+		common.BytesToHash(fromAddr.Bytes()),
+		common.BytesToHash(toAddr),
+	}
+
+	assert.Equal(expectedNumLogs, len(logs), "Unexpected number of logs")
+	assert.Equal(fromAddr, logs[idx].Address, "Unexpected from address")
+	assert.Equal(topics, logs[idx].Topics, "Unexpected topics")
+	assert.Equal(value, logs[idx].Data, "Unexpected transfer value")
 }
