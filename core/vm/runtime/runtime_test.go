@@ -978,11 +978,11 @@ func BenchmarkTracerStepVsCallFrame(b *testing.B) {
 }
 
 func TestEIP7708TransferLogs(t *testing.T) {
-	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
 	assert := assert.New(t)
 	sendToAddr := byte(0xbb)
 	value := byte(0x3)
 	maxValue := uint256.NewInt(20)
+	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
 
 	// Create a new contract that makes a call
 	callCode := []byte{
@@ -990,7 +990,7 @@ func TestEIP7708TransferLogs(t *testing.T) {
 		byte(vm.PUSH1), 0, // out offset
 		byte(vm.PUSH1), 0, // in size
 		byte(vm.PUSH1), 0, // in offset
-		byte(vm.PUSH1), value, // value = 1
+		byte(vm.PUSH1), value, // value = 3
 		byte(vm.PUSH1), sendToAddr, // address
 		byte(vm.GAS),
 		byte(vm.CALL),
