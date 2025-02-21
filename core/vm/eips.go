@@ -535,6 +535,16 @@ func enable4762(jt *JumpTable) {
 	}
 }
 
+// Enable EIP-2937
+func enable2937(jt *JumpTable) {
+	jt[SET_INDESTRUCTIBLE] = &operation{
+		execute:     opSetIndestructible,
+		constantGas: GasQuickStep,
+		minStack:    minStack(0, 0),
+		maxStack:    maxStack(0, 0),
+	}
+}
+
 // enableEOF applies the EOF changes.
 // OBS! For EOF, there are two changes:
 //  1. Two separate jumptables are required. One, EOF-jumptable, is used by
@@ -568,6 +578,7 @@ func enableEOF(jt *JumpTable) {
 	jt[EXTCODECOPY] = undefined
 	jt[EXTCODEHASH] = undefined
 	jt[GAS] = undefined
+	jt[SET_INDESTRUCTIBLE] = undefined
 	// Allow 0xFE to terminate sections
 	jt[INVALID] = &operation{
 		execute:     opUndefined,
@@ -702,15 +713,5 @@ func enableEOF(jt *JumpTable) {
 		minStack:    minStack(3, 1),
 		maxStack:    maxStack(3, 1),
 		memorySize:  memoryExtCall,
-	}
-}
-
-// Enable EIP-2937
-func enable2937(jt *JumpTable) {
-	jt[SET_INDESTRUCTIBLE] = &operation{
-		execute:     opSetIndestructible,
-		constantGas: GasQuickStep,   // Using G_base (2 gas) as specified in EIP
-		minStack:    minStack(0, 0), // Takes no args, returns nothing
-		maxStack:    maxStack(0, 0),
 	}
 }
