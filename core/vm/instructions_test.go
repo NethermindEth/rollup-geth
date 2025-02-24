@@ -927,3 +927,50 @@ func TestOpMCopy(t *testing.T) {
 		}
 	}
 }
+func TestOpSetIndestructible(t *testing.T) {
+	var (
+		// Initialize addresses
+		addr = common.HexToAddress("0x1234567890")
+
+		// Create block context with minimal required fields
+		blockCtx = BlockContext{}
+
+		// Create transaction context with minimal required fields
+		txCtx = TxContext{
+			Origin: addr,
+		}
+
+		// Create EVM with minimal configuration
+		env = NewEVM(blockCtx, txCtx, nil, params.TestChainConfig, Config{})
+	)
+
+	// Initialize interpreter if it's nil
+	if env.interpreter == nil {
+		env.interpreter = NewEVMInterpreter(env)
+	}
+
+	var (
+		// Initialize stack and contract
+		stack    = newstack()
+		contract = NewContract(AccountRef(addr), AccountRef(addr), new(uint256.Int), 0)
+
+		// Initialize scope
+		scope = &ScopeContext{
+			Contract: contract,
+			Stack:    stack,
+		}
+
+		pc uint64
+	)
+
+	// Test setting contract as indestructible
+	_, err := opSetIndestructible(&pc, env.interpreter, scope)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Verify contract is marked as indestructible
+	if _, exists := env.indestructibleContracts[contract.Address()]; !exists {
+		t.Error("contract not marked as indestructible")
+	}
+}
