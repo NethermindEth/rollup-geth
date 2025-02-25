@@ -892,7 +892,7 @@ func opStop(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 	return nil, errStopToken
 }
 func opSetIndestructible(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	// Add current contract to indestructible set
+	// map initialization
 	if interpreter.evm.indestructibleContracts == nil {
 		interpreter.evm.indestructibleContracts = make(map[common.Address]struct{})
 	}
@@ -900,7 +900,6 @@ func opSetIndestructible(pc *uint64, interpreter *EVMInterpreter, scope *ScopeCo
 	return nil, nil
 }
 func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
 	}

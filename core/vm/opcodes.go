@@ -211,9 +211,9 @@ const (
 	LOG4
 )
 
-// Special opcodes
+// Special opcode
 const (
-	SET_INDESTRUCTIBLE OpCode = 0xA8
+	SET_INDESTRUCTIBLE OpCode = 0xa8
 )
 
 // 0xd0 range - eof operations.

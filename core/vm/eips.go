@@ -578,7 +578,6 @@ func enableEOF(jt *JumpTable) {
 	jt[EXTCODECOPY] = undefined
 	jt[EXTCODEHASH] = undefined
 	jt[GAS] = undefined
-	jt[SET_INDESTRUCTIBLE] = undefined
 	// Allow 0xFE to terminate sections
 	jt[INVALID] = &operation{
 		execute:     opUndefined,
