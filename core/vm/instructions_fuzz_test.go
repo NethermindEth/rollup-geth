@@ -48,7 +48,7 @@ func FuzzOpIsStatic(f *testing.F) {
 		contract := NewContract(contractRef{common.Address{}}, AccountRef(common.Address{1}), uint256.NewInt(0), 100000)
 		contract.Code = bytecode
 
-		tracer := &isStaticTracer{opcodeAfterIsStatic: bytecode[bytes.IndexByte(bytecode, byte(ISSTATIC))+1]}
+		tracer := &isStaticTracer{opcodeAfterIsStatic: bytecode[isStaticIndex+1]}
 		statedb, err := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
 		if err != nil {
 			t.Fatal(err)
