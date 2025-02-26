@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"math/big"
 	"os"
 	"strings"
@@ -924,6 +925,105 @@ func TestOpMCopy(t *testing.T) {
 		wantGas := tc.wantGas
 		if haveGas != wantGas {
 			t.Errorf("case %d: gas wrong, want %d have %d\n", i, wantGas, haveGas)
+		}
+	}
+}
+
+// Define a custom tracer to check if the ISSTATIC opcode was called
+type isStaticTracer struct {
+	called              bool
+	returnedValue       *uint256.Int
+	opcodeAfterIsStatic byte
+}
+
+func (t *isStaticTracer) OnOpcode(pc uint64, op byte, gas, cost uint64, scope tracing.OpContext, rData []byte, depth int, err error) {
+	if op == byte(ISSTATIC) {
+		t.called = true
+	}
+	if t.called && op == t.opcodeAfterIsStatic && t.returnedValue == nil {
+		st := scope.StackData()
+		t.returnedValue = (*uint256.Int).Clone(&st[len(st)-1])
+	}
+}
+
+func TestOpIsStatic(t *testing.T) {
+	// EVM mnemonics of the Solidity function below; note that
+	// isstatic() isn't actually recognizable by Solidity and is a custom opcode that is being tested with this testcase.
+	//
+	//function getDouble(uint256 x) public pure returns (uint256) {
+	//	return x * 2, isstatic();
+	//}
+	bytecode := []byte{
+		byte(PUSH1), 0,
+		byte(CALLDATALOAD),
+		byte(PUSH1), 2,
+		byte(MUL),
+		byte(PUSH1), 0,
+		byte(MSTORE),
+		byte(ISSTATIC), // This is the new ISSTATIC opcode (EIP-2970)
+		byte(PUSH1), 32,
+		byte(MSTORE),
+		byte(PUSH1), 64,
+		byte(PUSH1), 0,
+		byte(RETURN),
+	}
+
+	// Create a new contract with 'getDouble' function
+	contract := NewContract(contractRef{common.Address{}}, AccountRef(common.Address{1}), uint256.NewInt(0), 100000)
+	contract.Code = bytecode
+
+	tracer := &isStaticTracer{opcodeAfterIsStatic: bytecode[bytes.IndexByte(bytecode, byte(ISSTATIC))+1]}
+	var (
+		env = NewEVM(
+			BlockContext{BlockNumber: big.NewInt(1), Random: &common.Hash{}, Time: 1},
+			TxContext{},
+			nil,
+			params.MergedTestChainConfig,
+			Config{
+				Tracer: &tracing.Hooks{
+					OnOpcode: tracer.OnOpcode,
+				},
+			},
+		)
+		evmInterpreter = env.interpreter
+	)
+
+	// Input is 5
+	input := make([]byte, 32)
+	input[31] = 5
+
+	for _, tt := range []struct {
+		name                  string
+		isReadOnly            bool
+		expectedIsStaticValue *uint256.Int
+	}{
+		{name: "ISSTATIC=true", isReadOnly: true, expectedIsStaticValue: uint256.NewInt(1)},
+		{name: "ISSTATIC=false", isReadOnly: false, expectedIsStaticValue: uint256.NewInt(0)},
+	} {
+		// Reset the tracer's values
+		tracer.called = false
+		tracer.returnedValue = nil
+
+		// If 'readOnly' set to true = STATICCALL
+		resultData, err := evmInterpreter.Run(contract, input, tt.isReadOnly)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		doubledValue := new(uint256.Int).SetBytes(resultData[:32])
+		isStaticValue := new(uint256.Int).SetBytes(resultData[32:])
+
+		if !doubledValue.Eq(uint256.NewInt(10)) {
+			t.Errorf("Testcase %v: expected 10, got %v", tt.name, doubledValue)
+		}
+		if !tracer.called {
+			t.Errorf("Testcase %v: ISSTATIC opcode was not called", tt.name)
+		}
+		if !isStaticValue.Eq(tt.expectedIsStaticValue) {
+			t.Errorf("Testcase %v: expected %v, got %v", tt.name, tt.expectedIsStaticValue, isStaticValue)
+		}
+		if !tracer.returnedValue.Eq(tt.expectedIsStaticValue) {
+			t.Errorf("Testcase %v: expected %v, got %v", tt.name, tt.expectedIsStaticValue, tracer.returnedValue)
 		}
 	}
 }

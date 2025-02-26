@@ -104,6 +104,7 @@ const (
 	BASEFEE     OpCode = 0x48
 	BLOBHASH    OpCode = 0x49
 	BLOBBASEFEE OpCode = 0x4a
+	ISSTATIC    OpCode = 0x4b // To determine if the current context is static or not, as described at EIP-2970
 )
 
 // 0x50 range - 'storage' and execution.
@@ -318,6 +319,7 @@ var opCodeToString = [256]string{
 	BASEFEE:     "BASEFEE",
 	BLOBHASH:    "BLOBHASH",
 	BLOBBASEFEE: "BLOBBASEFEE",
+	ISSTATIC:    "ISSTATIC",
 
 	// 0x50 range - 'storage' and execution.
 	POP:      "POP",
@@ -499,6 +501,7 @@ var stringToOp = map[string]OpCode{
 	"BASEFEE":         BASEFEE,
 	"BLOBHASH":        BLOBHASH,
 	"BLOBBASEFEE":     BLOBBASEFEE,
+	"ISSTATIC":        ISSTATIC,
 	"DELEGATECALL":    DELEGATECALL,
 	"STATICCALL":      STATICCALL,
 	"CODESIZE":        CODESIZE,
