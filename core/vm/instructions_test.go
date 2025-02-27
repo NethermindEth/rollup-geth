@@ -19,6 +19,7 @@ package vm
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -28,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -927,50 +929,77 @@ func TestOpMCopy(t *testing.T) {
 		}
 	}
 }
+
+// Define a custom tracer to check if the SET_INDESTRUCTIBLE opcode was called
+type setIndestructibleTracer struct {
+	seenSetIndestructible bool
+	seenSelfdestruct      bool
+}
+
+func (t *setIndestructibleTracer) OnOpcode(pc uint64, op byte, gas, cost uint64, scope tracing.OpContext, rData []byte, depth int, err error) {
+	if op == byte(SET_INDESTRUCTIBLE) {
+		t.seenSetIndestructible = true
+	}
+	if op == byte(SELFDESTRUCT) {
+		t.seenSelfdestruct = true
+	}
+}
+
 func TestOpSetIndestructible(t *testing.T) {
-	var (
-		// Initialize addresses
-		addr = common.HexToAddress("0x1234567890")
-
-		// Create block context with minimal required fields
-		blockCtx = BlockContext{}
-
-		// Create transaction context with minimal required fields
-		txCtx = TxContext{
-			Origin: addr,
+	t.Run("SET_INDESTRUCTIBLE at position 0", func(t *testing.T) {
+		bytecode := []byte{
+			byte(SET_INDESTRUCTIBLE),
+			byte(PUSH1), 0x0,
+			byte(SELFDESTRUCT),
 		}
 
-		// Create EVM with minimal configuration
-		env = NewEVM(blockCtx, txCtx, nil, params.TestChainConfig, Config{})
-	)
+		addr := common.HexToAddress("0x1")
 
-	// Initialize interpreter if it's nil
-	if env.interpreter == nil {
-		env.interpreter = NewEVMInterpreter(env)
-	}
+		contract := NewContract(AccountRef(addr), AccountRef(addr), uint256.NewInt(0), 100000)
+		contract.Code = bytecode
 
-	var (
-		// Initialize stack and contract
-		stack    = newstack()
-		contract = NewContract(AccountRef(addr), AccountRef(addr), new(uint256.Int), 0)
+		tracer := &setIndestructibleTracer{}
 
-		// Initialize scope
-		scope = &ScopeContext{
-			Contract: contract,
-			Stack:    stack,
+		statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
+		statedb.CreateAccount(addr)
+		statedb.CreateContract(addr)
+		statedb.SetCode(addr, bytecode)
+
+		env := NewEVM(BlockContext{BlockNumber: big.NewInt(1), Random: &common.Hash{}, Time: 1}, TxContext{Origin: addr}, statedb, params.TestChainConfig, Config{
+			Tracer: &tracing.Hooks{
+				OnOpcode: tracer.OnOpcode,
+			},
+		})
+
+		// Use the CommonCoreV1 instruction set which includes SET_INDESTRUCTIBLE
+		table := newCommonCoreV1InstructionSet()
+		env.interpreter.table = &table
+
+		// Run the contract
+		_, err := env.interpreter.Run(contract, nil, false)
+
+		// Verify that SET_INDESTRUCTIBLE was executed
+		if !tracer.seenSetIndestructible {
+			t.Error("SET_INDESTRUCTIBLE opcode was not executed")
 		}
 
-		pc uint64
-	)
+		// Verify that SELFDESTRUCT was executed
+		if !tracer.seenSelfdestruct {
+			t.Error("SELFDESTRUCT opcode was not executed")
+		}
 
-	// Test setting contract as indestructible
-	_, err := opSetIndestructible(&pc, env.interpreter, scope)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+		// Verify that the contract is marked as indestructible
+		if _, exists := env.indestructibleContracts[addr]; !exists {
+			t.Error("contract not marked as indestructible")
+		}
 
-	// Verify contract is marked as indestructible
-	if _, exists := env.indestructibleContracts[contract.Address()]; !exists {
-		t.Error("contract not marked as indestructible")
-	}
+		// Verify that the execution failed with ErrIndestructibleContract
+		if err == nil {
+			t.Error("expected execution to fail with ErrIndestructibleContract, but it succeeded")
+		} else if !errors.Is(err, ErrIndestructibleContract) {
+			t.Errorf("expected ErrIndestructibleContract, got %v", err)
+		}
+
+	})
+
 }
