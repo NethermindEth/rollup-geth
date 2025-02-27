@@ -62,6 +62,7 @@ var (
 	cancunInstructionSet           = newCancunInstructionSet()
 	verkleInstructionSet           = newVerkleInstructionSet()
 	pragueEOFInstructionSet        = newPragueEOFInstructionSet()
+	commonCoreV1InstructionSet     = newCommonCoreV1InstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
@@ -85,6 +86,12 @@ func validate(jt JumpTable) JumpTable {
 	return jt
 }
 
+// New instruction sets for common core V1 changes (i.e. the changes that are commonly shared by all L2s)
+func newCommonCoreV1InstructionSet() JumpTable {
+	instructionSet := newCancunInstructionSet()
+	enable2937(&instructionSet) // EIP-2937 SET_INDESTRUCTIBLE opcode
+	return validate(instructionSet)
+}
 func newVerkleInstructionSet() JumpTable {
 	instructionSet := newCancunInstructionSet()
 	enable4762(&instructionSet)
