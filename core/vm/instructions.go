@@ -901,18 +901,10 @@ func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 	interpreter.evm.StateDB.AddBalance(beneficiary.Bytes20(), balance, tracing.BalanceIncreaseSelfdestruct)
 	// Emit log for ETH transfer (EIP-7708)
 	if interpreter.evm.chainRules.IsEIP7708 && !balance.IsZero() {
-		data := balance.Bytes32()
-		topics := []common.Hash{
-			common.BytesToHash([]byte{common.MagicTransferLog}),
-			common.BytesToHash(scope.Contract.Address().Bytes()),
-			beneficiary.Bytes32()}
-
-		interpreter.evm.StateDB.AddLog(&types.Log{
-			Address:     scope.Contract.Address(),
-			Topics:      topics,
-			Data:        data[:],
-			BlockNumber: interpreter.evm.Context.BlockNumber.Uint64(),
-		})
+		interpreter.evm.StateDB.AddTransferLog(scope.Contract.Address(),
+			beneficiary.Bytes20(),
+			balance,
+			interpreter.evm.Context.BlockNumber.Uint64())
 	}
 	interpreter.evm.StateDB.SelfDestruct(scope.Contract.Address())
 	if tracer := interpreter.evm.Config.Tracer; tracer != nil {
@@ -936,18 +928,10 @@ func opSelfdestruct6780(pc *uint64, interpreter *EVMInterpreter, scope *ScopeCon
 	interpreter.evm.StateDB.AddBalance(beneficiary.Bytes20(), balance, tracing.BalanceIncreaseSelfdestruct)
 	// Emit log for ETH transfer (EIP-7708)
 	if interpreter.evm.chainRules.IsEIP7708 && !balance.IsZero() {
-		data := balance.Bytes32()
-		topics := []common.Hash{
-			common.BytesToHash([]byte{common.MagicTransferLog}),
-			common.BytesToHash(scope.Contract.Address().Bytes()),
-			beneficiary.Bytes32()}
-
-		interpreter.evm.StateDB.AddLog(&types.Log{
-			Address:     scope.Contract.Address(),
-			Topics:      topics,
-			Data:        data[:],
-			BlockNumber: interpreter.evm.Context.BlockNumber.Uint64(),
-		})
+		interpreter.evm.StateDB.AddTransferLog(scope.Contract.Address(),
+			beneficiary.Bytes20(),
+			balance,
+			interpreter.evm.Context.BlockNumber.Uint64())
 	}
 	interpreter.evm.StateDB.Selfdestruct6780(scope.Contract.Address())
 	if tracer := interpreter.evm.Config.Tracer; tracer != nil {

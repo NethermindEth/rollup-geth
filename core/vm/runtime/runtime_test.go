@@ -1060,13 +1060,13 @@ func TestEIP7708TransferLogs(t *testing.T) {
 func verifyTransferLog(assert *assert.Assertions, logs []*types.Log, expectedNumLogs, idx int,
 	fromAddr common.Address, toAddr []byte, value []byte) {
 	topics := []common.Hash{
-		common.BytesToHash([]byte{common.MagicTransferLog}),
+		state.TransferTopic,
 		common.BytesToHash(fromAddr.Bytes()),
 		common.BytesToHash(toAddr),
 	}
 
 	assert.Equal(expectedNumLogs, len(logs), "Unexpected number of logs")
-	assert.Equal(fromAddr, logs[idx].Address, "Unexpected from address")
+	assert.Equal(state.TransferAddress, logs[idx].Address, "Unexpected from address")
 	assert.Equal(topics, logs[idx].Topics, "Unexpected topics")
 	assert.Equal(value, logs[idx].Data, "Unexpected transfer value")
 }

@@ -54,6 +54,13 @@ const (
 	deletion
 )
 
+var (
+	// keccak256("Transfer(address,address,uint256,uint64)")
+	TransferTopic = common.HexToHash("33ed79cbacd572bd943c5ab74ad5bc20a65c552ca0e75939008fb5daeb09d9d6")
+	// ERC-7528
+	TransferAddress = common.HexToAddress("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE")
+)
+
 type mutation struct {
 	typ     mutationType
 	applied bool
@@ -253,6 +260,21 @@ func (s *StateDB) AddLog(log *types.Log) {
 	}
 	s.logs[s.thash] = append(s.logs[s.thash], log)
 	s.logSize++
+}
+
+func (s *StateDB) AddTransferLog(sender, recipient common.Address, amount *uint256.Int, blockNumber uint64) {
+	data := amount.Bytes32()
+	topics := []common.Hash{
+		TransferTopic,
+		common.BytesToHash(sender.Bytes()),
+		common.BytesToHash(recipient.Bytes()),
+	}
+	s.AddLog(&types.Log{
+		Address:     TransferAddress,
+		Topics:      topics,
+		Data:        data[:],
+		BlockNumber: blockNumber,
+	})
 }
 
 // GetLogs returns the logs matching the specified transaction hash, and annotates
