@@ -928,6 +928,9 @@ func opSelfdestruct6780(pc *uint64, interpreter *EVMInterpreter, scope *ScopeCon
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
 	}
+	if _, ok := interpreter.evm.indestructibleContracts[scope.Contract.Address()]; ok {
+		return nil, ErrIndestructibleContract
+	}
 	beneficiary := scope.Stack.pop()
 	balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())
 	interpreter.evm.StateDB.SubBalance(scope.Contract.Address(), balance, tracing.BalanceDecreaseSelfdestruct)

@@ -965,15 +965,11 @@ func TestOpSetIndestructible(t *testing.T) {
 		statedb.CreateContract(addr)
 		statedb.SetCode(addr, bytecode)
 
-		env := NewEVM(BlockContext{BlockNumber: big.NewInt(1), Random: &common.Hash{}, Time: 1}, TxContext{Origin: addr}, statedb, params.TestChainConfig, Config{
+		env := NewEVM(BlockContext{BlockNumber: big.NewInt(1), Random: &common.Hash{}, Time: 1}, TxContext{Origin: addr}, statedb, params.MergedTestChainConfig, Config{
 			Tracer: &tracing.Hooks{
 				OnOpcode: tracer.OnOpcode,
 			},
 		})
-
-		// Use the CommonCoreV1 instruction set which includes SET_INDESTRUCTIBLE
-		table := newCommonCoreV1InstructionSet()
-		env.interpreter.table = &table
 
 		// Run the contract
 		_, err := env.interpreter.Run(contract, nil, false)
