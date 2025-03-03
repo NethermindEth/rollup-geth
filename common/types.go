@@ -39,8 +39,6 @@ const (
 	HashLength = 32
 	// AddressLength is the expected length of the address
 	AddressLength = 20
-	// Magic number to identify ETH transfers in logs (EIP-7708)
-	MagicTransferLog = 0xef
 )
 
 var (
