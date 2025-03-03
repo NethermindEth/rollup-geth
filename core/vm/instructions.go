@@ -899,13 +899,6 @@ func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 	beneficiary := scope.Stack.pop()
 	balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())
 	interpreter.evm.StateDB.AddBalance(beneficiary.Bytes20(), balance, tracing.BalanceIncreaseSelfdestruct)
-	// Emit log for ETH transfer (EIP-7708)
-	if interpreter.evm.chainRules.IsEIP7708 && !balance.IsZero() {
-		interpreter.evm.StateDB.AddTransferLog(scope.Contract.Address(),
-			beneficiary.Bytes20(),
-			balance,
-			interpreter.evm.Context.BlockNumber.Uint64())
-	}
 	interpreter.evm.StateDB.SelfDestruct(scope.Contract.Address())
 	if tracer := interpreter.evm.Config.Tracer; tracer != nil {
 		if tracer.OnEnter != nil {

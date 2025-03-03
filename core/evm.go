@@ -17,6 +17,7 @@
 package core
 
 import (
+	"math"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -139,7 +140,7 @@ func CanTransfer(db vm.StateDB, addr common.Address, amount *uint256.Int) bool {
 func Transfer(db vm.StateDB, sender, recipient common.Address, amount *uint256.Int, blockNumber uint64) {
 	db.SubBalance(sender, amount, tracing.BalanceChangeTransfer)
 	db.AddBalance(recipient, amount, tracing.BalanceChangeTransfer)
-	if amount.Sign() > 0 {
+	if blockNumber != math.MaxUint64 && amount.Sign() > 0 {
 		db.AddTransferLog(sender, recipient, amount, blockNumber)
 	}
 }

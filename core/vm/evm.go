@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -205,7 +206,12 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		}
 		evm.StateDB.CreateAccount(addr)
 	}
-	evm.Context.Transfer(evm.StateDB, caller.Address(), addr, value, evm.Context.BlockNumber.Uint64())
+	// Emit log for ETH transfer (EIP-7708)
+	if evm.chainRules.IsEIP7708 {
+		evm.Context.Transfer(evm.StateDB, caller.Address(), addr, value, evm.Context.BlockNumber.Uint64())
+	} else {
+		evm.Context.Transfer(evm.StateDB, caller.Address(), addr, value, math.MaxUint64)
+	}
 
 	if isPrecompile {
 		ret, gas, err = RunPrecompiledContract(p, input, gas, evm.Config.Tracer)
@@ -507,7 +513,12 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 		}
 		gas = gas - statelessGas
 	}
-	evm.Context.Transfer(evm.StateDB, caller.Address(), address, value, evm.Context.BlockNumber.Uint64())
+	// Emit log for ETH transfer (EIP-7708)
+	if evm.chainRules.IsEIP7708 {
+		evm.Context.Transfer(evm.StateDB, caller.Address(), address, value, evm.Context.BlockNumber.Uint64())
+	} else {
+		evm.Context.Transfer(evm.StateDB, caller.Address(), address, value, math.MaxUint64)
+	}
 
 	// Initialise a new contract and set the code that is to be used by the EVM.
 	// The contract is a scoped environment for this execution context only.
