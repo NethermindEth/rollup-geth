@@ -35,6 +35,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/blake2b"
 	"github.com/ethereum/go-ethereum/crypto/bn256"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
+	"github.com/ethereum/go-ethereum/crypto/secp256r1"
 	"github.com/ethereum/go-ethereum/params"
 	"golang.org/x/crypto/ripemd160"
 )
@@ -118,25 +119,26 @@ var PrecompiledContractsCancun = PrecompiledContracts{
 // PrecompiledContractsPrague contains the set of pre-compiled Ethereum
 // contracts used in the Prague release.
 var PrecompiledContractsPrague = PrecompiledContracts{
-	common.BytesToAddress([]byte{0x01}): &ecrecover{},
-	common.BytesToAddress([]byte{0x02}): &sha256hash{},
-	common.BytesToAddress([]byte{0x03}): &ripemd160hash{},
-	common.BytesToAddress([]byte{0x04}): &dataCopy{},
-	common.BytesToAddress([]byte{0x05}): &bigModExp{eip2565: true},
-	common.BytesToAddress([]byte{0x06}): &bn256AddIstanbul{},
-	common.BytesToAddress([]byte{0x07}): &bn256ScalarMulIstanbul{},
-	common.BytesToAddress([]byte{0x08}): &bn256PairingIstanbul{},
-	common.BytesToAddress([]byte{0x09}): &blake2F{},
-	common.BytesToAddress([]byte{0x0a}): &kzgPointEvaluation{},
-	common.BytesToAddress([]byte{0x0b}): &bls12381G1Add{},
-	common.BytesToAddress([]byte{0x0c}): &bls12381G1Mul{},
-	common.BytesToAddress([]byte{0x0d}): &bls12381G1MultiExp{},
-	common.BytesToAddress([]byte{0x0e}): &bls12381G2Add{},
-	common.BytesToAddress([]byte{0x0f}): &bls12381G2Mul{},
-	common.BytesToAddress([]byte{0x10}): &bls12381G2MultiExp{},
-	common.BytesToAddress([]byte{0x11}): &bls12381Pairing{},
-	common.BytesToAddress([]byte{0x12}): &bls12381MapG1{},
-	common.BytesToAddress([]byte{0x13}): &bls12381MapG2{},
+	common.BytesToAddress([]byte{0x01}):       &ecrecover{},
+	common.BytesToAddress([]byte{0x02}):       &sha256hash{},
+	common.BytesToAddress([]byte{0x03}):       &ripemd160hash{},
+	common.BytesToAddress([]byte{0x04}):       &dataCopy{},
+	common.BytesToAddress([]byte{0x05}):       &bigModExp{eip2565: true},
+	common.BytesToAddress([]byte{0x06}):       &bn256AddIstanbul{},
+	common.BytesToAddress([]byte{0x07}):       &bn256ScalarMulIstanbul{},
+	common.BytesToAddress([]byte{0x08}):       &bn256PairingIstanbul{},
+	common.BytesToAddress([]byte{0x09}):       &blake2F{},
+	common.BytesToAddress([]byte{0x0a}):       &kzgPointEvaluation{},
+	common.BytesToAddress([]byte{0x0b}):       &bls12381G1Add{},
+	common.BytesToAddress([]byte{0x0c}):       &bls12381G1Mul{},
+	common.BytesToAddress([]byte{0x0d}):       &bls12381G1MultiExp{},
+	common.BytesToAddress([]byte{0x0e}):       &bls12381G2Add{},
+	common.BytesToAddress([]byte{0x0f}):       &bls12381G2Mul{},
+	common.BytesToAddress([]byte{0x10}):       &bls12381G2MultiExp{},
+	common.BytesToAddress([]byte{0x11}):       &bls12381Pairing{},
+	common.BytesToAddress([]byte{0x12}):       &bls12381MapG1{},
+	common.BytesToAddress([]byte{0x13}):       &bls12381MapG2{},
+	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{},
 }
 
 var PrecompiledContractsBLS = PrecompiledContractsPrague
@@ -1250,4 +1252,43 @@ func kZGToVersionedHash(kzg kzg4844.Commitment) common.Hash {
 	h[0] = blobCommitmentVersionKZG
 
 	return h
+}
+
+// p256Verify implements the secp256r1 signature verification according to EIP-7212
+type p256Verify struct{}
+
+// RequiredGas returns the gas required to execute the pre-compiled
+// secp256r1 signature verification contract.
+func (c *p256Verify) RequiredGas(input []byte) uint64 {
+	return params.P256VerifyGas
+}
+
+// Run executes the pre-compiled contract
+func (c *p256Verify) Run(input []byte) ([]byte, error) {
+	// Input should be at least 160 bytes:
+	// - 32 bytes for the hash
+	// - 32 bytes for the r component of the signature
+	// - 32 bytes for the s component of the signature
+	// - 32 bytes for the x coordinate of the public key
+	// - 32 bytes for the y coordinate of the public key
+	if len(input) != 160 {
+		return nil, errors.New("p256Verify: input too short")
+	}
+
+	hash := input[0:32]
+	r := new(big.Int).SetBytes(input[32:64])
+	s := new(big.Int).SetBytes(input[64:96])
+	x := new(big.Int).SetBytes(input[96:128])
+	y := new(big.Int).SetBytes(input[128:160])
+
+	// If the signature is valid, return 1 as a 32-byte value
+	if valid, err := secp256r1.Verify(hash, r, s, x, y); err != nil {
+		return nil, err
+	} else if valid {
+		result := make([]byte, 32)
+		result[31] = 1
+		return result, nil
+	}
+	// If the signature is invalid, return empty output
+	return nil, nil
 }
