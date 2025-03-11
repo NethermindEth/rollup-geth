@@ -11,7 +11,7 @@ import (
 func Verify(hash []byte, r, s, x, y *big.Int) bool {
 	curve := elliptic.P256()
 
-	if !curve.IsOnCurve(x, y) || x == nil || y == nil {
+	if x == nil || y == nil || !curve.IsOnCurve(x, y) {
 		return false
 	}
 
