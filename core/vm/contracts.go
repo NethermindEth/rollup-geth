@@ -1282,9 +1282,7 @@ func (c *p256Verify) Run(input []byte) ([]byte, error) {
 	y := new(big.Int).SetBytes(input[128:160])
 
 	// If the signature is valid, return 1 as a 32-byte value
-	if valid, err := secp256r1.Verify(hash, r, s, x, y); err != nil {
-		return nil, err
-	} else if valid {
+	if secp256r1.Verify(hash, r, s, x, y) {
 		result := make([]byte, 32)
 		result[31] = 1
 		return result, nil
