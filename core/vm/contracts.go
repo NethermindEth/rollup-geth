@@ -119,23 +119,26 @@ var PrecompiledContractsCancun = PrecompiledContracts{
 // PrecompiledContractsPrague contains the set of pre-compiled Ethereum
 // contracts used in the Prague release.
 var PrecompiledContractsPrague = PrecompiledContracts{
-	common.BytesToAddress([]byte{0x01}):       &ecrecover{},
-	common.BytesToAddress([]byte{0x02}):       &sha256hash{},
-	common.BytesToAddress([]byte{0x03}):       &ripemd160hash{},
-	common.BytesToAddress([]byte{0x04}):       &dataCopy{},
-	common.BytesToAddress([]byte{0x05}):       &bigModExp{eip2565: true},
-	common.BytesToAddress([]byte{0x06}):       &bn256AddIstanbul{},
-	common.BytesToAddress([]byte{0x07}):       &bn256ScalarMulIstanbul{},
-	common.BytesToAddress([]byte{0x08}):       &bn256PairingIstanbul{},
-	common.BytesToAddress([]byte{0x09}):       &blake2F{},
-	common.BytesToAddress([]byte{0x0a}):       &kzgPointEvaluation{},
-	common.BytesToAddress([]byte{0x0b}):       &bls12381G1Add{},
-	common.BytesToAddress([]byte{0x0c}):       &bls12381G1MultiExp{},
-	common.BytesToAddress([]byte{0x0d}):       &bls12381G2Add{},
-	common.BytesToAddress([]byte{0x0e}):       &bls12381G2MultiExp{},
-	common.BytesToAddress([]byte{0x0f}):       &bls12381Pairing{},
-	common.BytesToAddress([]byte{0x10}):       &bls12381MapG1{},
-	common.BytesToAddress([]byte{0x11}):       &bls12381MapG2{},
+	common.BytesToAddress([]byte{0x01}): &ecrecover{},
+	common.BytesToAddress([]byte{0x02}): &sha256hash{},
+	common.BytesToAddress([]byte{0x03}): &ripemd160hash{},
+	common.BytesToAddress([]byte{0x04}): &dataCopy{},
+	common.BytesToAddress([]byte{0x05}): &bigModExp{eip2565: true},
+	common.BytesToAddress([]byte{0x06}): &bn256AddIstanbul{},
+	common.BytesToAddress([]byte{0x07}): &bn256ScalarMulIstanbul{},
+	common.BytesToAddress([]byte{0x08}): &bn256PairingIstanbul{},
+	common.BytesToAddress([]byte{0x09}): &blake2F{},
+	common.BytesToAddress([]byte{0x0a}): &kzgPointEvaluation{},
+	common.BytesToAddress([]byte{0x0b}): &bls12381G1Add{},
+	common.BytesToAddress([]byte{0x0c}): &bls12381G1MultiExp{},
+	common.BytesToAddress([]byte{0x0d}): &bls12381G2Add{},
+	common.BytesToAddress([]byte{0x0e}): &bls12381G2MultiExp{},
+	common.BytesToAddress([]byte{0x0f}): &bls12381Pairing{},
+	common.BytesToAddress([]byte{0x10}): &bls12381MapG1{},
+	common.BytesToAddress([]byte{0x11}): &bls12381MapG2{},
+}
+
+var PrecompiledContractsCommonCoreV1 = PrecompiledContracts{
 	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{},
 }
 
@@ -144,12 +147,13 @@ var PrecompiledContractsBLS = PrecompiledContractsPrague
 var PrecompiledContractsVerkle = PrecompiledContractsPrague
 
 var (
-	PrecompiledAddressesPrague    []common.Address
-	PrecompiledAddressesCancun    []common.Address
-	PrecompiledAddressesBerlin    []common.Address
-	PrecompiledAddressesIstanbul  []common.Address
-	PrecompiledAddressesByzantium []common.Address
-	PrecompiledAddressesHomestead []common.Address
+	PrecompiledAddressesPrague       []common.Address
+	PrecompiledAddressesCancun       []common.Address
+	PrecompiledAddressesBerlin       []common.Address
+	PrecompiledAddressesIstanbul     []common.Address
+	PrecompiledAddressesByzantium    []common.Address
+	PrecompiledAddressesHomestead    []common.Address
+	PrecompiledAddressesCommonCoreV1 []common.Address
 )
 
 func init() {
@@ -171,6 +175,9 @@ func init() {
 	for k := range PrecompiledContractsPrague {
 		PrecompiledAddressesPrague = append(PrecompiledAddressesPrague, k)
 	}
+	for k := range PrecompiledContractsCommonCoreV1 {
+		PrecompiledAddressesCommonCoreV1 = append(PrecompiledAddressesCommonCoreV1, k)
+	}
 }
 
 func activePrecompiledContracts(rules params.Rules) PrecompiledContracts {
@@ -187,6 +194,8 @@ func activePrecompiledContracts(rules params.Rules) PrecompiledContracts {
 		return PrecompiledContractsIstanbul
 	case rules.IsByzantium:
 		return PrecompiledContractsByzantium
+	case rules.IsCommonCoreV1:
+		return PrecompiledContractsCommonCoreV1
 	default:
 		return PrecompiledContractsHomestead
 	}
@@ -1196,14 +1205,16 @@ func (c *p256Verify) RequiredGas(input []byte) uint64 {
 
 // Run executes the pre-compiled contract
 func (c *p256Verify) Run(input []byte) ([]byte, error) {
-	// Input should be at least 160 bytes:
+	// Input should be  160 bytes:
 	// - 32 bytes for the hash
 	// - 32 bytes for the r component of the signature
 	// - 32 bytes for the s component of the signature
 	// - 32 bytes for the x coordinate of the public key
 	// - 32 bytes for the y coordinate of the public key
-	if len(input) != 160 {
-		return nil, errors.New("p256Verify: input too short")
+	const expectedInputLenght = 160
+
+	if len(input) != expectedInputLenght {
+		return nil, nil
 	}
 
 	hash := input[0:32]
