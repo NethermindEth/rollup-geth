@@ -928,7 +928,7 @@ func TestOpSetIndestructible(t *testing.T) {
 
 		addr := common.HexToAddress("0x1")
 
-		contract := NewContract((addr), (addr), uint256.NewInt(0), 100000, nil)
+		contract := NewContract(addr, addr, uint256.NewInt(0), 100000, nil)
 		contract.Code = bytecode
 
 		tracer := &setIndestructibleTracer{}
