@@ -1,4 +1,4 @@
-// Copyright 2022 The go-ethereum Authors
+// Copyright 2024 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -18,7 +18,6 @@ package vm
 
 import (
 	"encoding/hex"
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -95,7 +94,6 @@ func TestEOFSubcontainer(t *testing.T) {
 	if err := got.UnmarshalBinary(b, true); err != nil {
 		t.Fatal(err)
 	}
-	fmt.Print(got)
 	if res := got.MarshalBinary(); !reflect.DeepEqual(res, b) {
 		t.Fatalf("invalid marshalling, want %v got %v", b, res)
 	}
