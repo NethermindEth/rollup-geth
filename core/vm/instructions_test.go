@@ -928,7 +928,7 @@ func TestOpSetIndestructible(t *testing.T) {
 
 		addr := common.HexToAddress("0x1")
 
-		contract := NewContract(AccountRef(addr), AccountRef(addr), uint256.NewInt(0), 100000)
+		contract := NewContract((addr), (addr), uint256.NewInt(0), 100000, nil)
 		contract.Code = bytecode
 
 		tracer := &setIndestructibleTracer{}
@@ -938,7 +938,7 @@ func TestOpSetIndestructible(t *testing.T) {
 		statedb.CreateContract(addr)
 		statedb.SetCode(addr, bytecode)
 
-		env := NewEVM(BlockContext{BlockNumber: big.NewInt(1), Random: &common.Hash{}, Time: 1}, TxContext{Origin: addr}, statedb, params.MergedTestChainConfig, Config{
+		env := NewEVM(BlockContext{BlockNumber: big.NewInt(1), Random: &common.Hash{}, Time: 1}, statedb, params.MergedTestChainConfig, Config{
 			Tracer: &tracing.Hooks{
 				OnOpcode: tracer.OnOpcode,
 			},
@@ -970,6 +970,7 @@ func TestOpSetIndestructible(t *testing.T) {
 		}
 
 	})
+}
 
 // TestPush sanity-checks how code with immediates are handled when the code size is
 // smaller than the size of the immediate.
