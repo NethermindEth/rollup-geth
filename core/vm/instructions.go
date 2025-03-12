@@ -886,7 +886,17 @@ func opUndefined(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 func opStop(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	return nil, errStopToken
 }
+func opSetIndestructible(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if *pc != 0 {
+		return nil, nil
+	}
 
+	if interpreter.evm.indestructibleContracts == nil {
+		interpreter.evm.indestructibleContracts = make(map[common.Address]struct{})
+	}
+	interpreter.evm.indestructibleContracts[scope.Contract.Address()] = struct{}{}
+	return nil, nil
+}
 func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
@@ -909,6 +919,9 @@ func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 func opSelfdestruct6780(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
+	}
+	if _, ok := interpreter.evm.indestructibleContracts[scope.Contract.Address()]; ok {
+		return nil, ErrIndestructibleContract
 	}
 	beneficiary := scope.Stack.pop()
 	balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())
