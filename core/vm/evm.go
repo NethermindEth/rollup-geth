@@ -224,6 +224,10 @@ func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, g
 	evm.Context.Transfer(evm.StateDB, caller, addr, value)
 
 	if isPrecompile {
+		// If this is a stateful precompiled contract, set the EVM reference
+		if stateful, ok := p.(StatefulPrecompiledContract); ok {
+			stateful.SetEVM(evm)
+		}
 		ret, gas, err = RunPrecompiledContract(p, input, gas, evm.Config.Tracer)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
@@ -288,6 +292,10 @@ func (evm *EVM) CallCode(caller common.Address, addr common.Address, input []byt
 
 	// It is allowed to call precompiles, even via delegatecall
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
+		// If this is a stateful precompiled contract, set the EVM reference
+		if stateful, ok := p.(StatefulPrecompiledContract); ok {
+			stateful.SetEVM(evm)
+		}
 		ret, gas, err = RunPrecompiledContract(p, input, gas, evm.Config.Tracer)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
@@ -331,6 +339,10 @@ func (evm *EVM) DelegateCall(originCaller common.Address, caller common.Address,
 
 	// It is allowed to call precompiles, even via delegatecall
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
+		// If this is a stateful precompiled contract, set the EVM reference
+		if stateful, ok := p.(StatefulPrecompiledContract); ok {
+			stateful.SetEVM(evm)
+		}
 		ret, gas, err = RunPrecompiledContract(p, input, gas, evm.Config.Tracer)
 	} else {
 		// Initialise a new contract and make initialise the delegate values
@@ -383,6 +395,10 @@ func (evm *EVM) StaticCall(caller common.Address, addr common.Address, input []b
 	evm.StateDB.AddBalance(addr, new(uint256.Int), tracing.BalanceChangeTouchAccount)
 
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
+		// If this is a stateful precompiled contract, set the EVM reference
+		if stateful, ok := p.(StatefulPrecompiledContract); ok {
+			stateful.SetEVM(evm)
+		}
 		ret, gas, err = RunPrecompiledContract(p, input, gas, evm.Config.Tracer)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.

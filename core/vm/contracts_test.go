@@ -20,11 +20,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // precompiledTest defines the input/output pairs for precompiled contract tests.
@@ -57,6 +61,7 @@ var allPrecompiles = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{8}):    &bn256PairingIstanbul{},
 	common.BytesToAddress([]byte{9}):    &blake2F{},
 	common.BytesToAddress([]byte{0x0a}): &kzgPointEvaluation{},
+	common.BytesToAddress([]byte{0x0b}): &txIndex{},
 
 	common.BytesToAddress([]byte{0x0f, 0x0a}): &bls12381G1Add{},
 	common.BytesToAddress([]byte{0x0f, 0x0b}): &bls12381G1MultiExp{},
@@ -75,7 +80,7 @@ var blake2FMalformedInputTests = []precompiledFailureTest{
 		Name:          "vector 0: empty input",
 	},
 	{
-		Input:         "00000c48c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbabd9831f79217e1319cde05b61626300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000001",
+		Input:         "00000c48c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbabd9831f79217e1319cde05b6162630000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000001",
 		ExpectedError: errBlake2FInvalidInputLength.Error(),
 		Name:          "vector 1: less than 213 bytes input",
 	},
@@ -392,4 +397,33 @@ func BenchmarkPrecompiledBLS12381G2MultiExpWorstCase(b *testing.B) {
 		NoBenchmark: false,
 	}
 	benchmarkPrecompiled("f0f", testcase, b)
+}
+
+func TestPrecompiledTxIndex(t *testing.T) {
+	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
+
+	// Set a predefined transaction index (e.g., 42) in the StateDB
+	statedb.SetTxContext(common.Hash{}, 42)
+
+	env := NewEVM(BlockContext{
+		BlockNumber: big.NewInt(1),
+		Random:      &common.Hash{},
+		Time:        1,
+	}, statedb, params.MergedTestChainConfig, Config{})
+
+	// Create the txIndex precompile and set the EVM
+	txIndexPrecompile := &txIndex{}
+	txIndexPrecompile.SetEVM(env)
+
+	result, err := txIndexPrecompile.Run(nil)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Check the result
+	expected := []byte{0, 0, 0, 42} // 42 encoded as a 4-byte big-endian integer
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Expected %v, got %v", expected, result)
+	}
+
 }
