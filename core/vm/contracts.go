@@ -1202,7 +1202,7 @@ func kZGToVersionedHash(kzg kzg4844.Commitment) common.Hash {
 
 // txIndex implements EIP-7793 TXINDEX precompile.
 type txIndex struct {
-	evm *EVM
+	index uint
 }
 
 // RequiredGas returns the gas required to execute the TXINDEX precompile.
@@ -1212,21 +1212,15 @@ func (c *txIndex) RequiredGas(input []byte) uint64 {
 
 // Run returns the transaction index within the current block.
 func (c *txIndex) Run(input []byte) ([]byte, error) {
-	if c.evm == nil {
-		return nil, errors.New("txindex: evm not set")
-	}
-
-	// Get the transaction index from the StateDB
-	txIndex := c.evm.StateDB.TxIndex()
-
 	// Encode the transaction index as a 4-byte big-endian integer
 	output := make([]byte, 4)
-	binary.BigEndian.PutUint32(output, uint32(txIndex))
+	binary.BigEndian.PutUint32(output, uint32(c.index))
 
 	return output, nil
 }
 
 // SetEVM provides the contract with access to the EVM
 func (c *txIndex) SetEVM(evm *EVM) {
-	c.evm = evm
+	// Store the transaction index from the EVM's StateDB
+	c.index = uint(evm.StateDB.TxIndex())
 }
