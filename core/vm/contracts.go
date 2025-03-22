@@ -141,13 +141,19 @@ var PrecompiledContractsBLS = PrecompiledContractsPrague
 
 var PrecompiledContractsVerkle = PrecompiledContractsPrague
 
+var PrecompiledContractsCommonCoreV1 = PrecompiledContracts{
+	common.BytesToAddress([]byte{}): &txIndex{},
+}
+
 var (
-	PrecompiledAddressesPrague    []common.Address
-	PrecompiledAddressesCancun    []common.Address
-	PrecompiledAddressesBerlin    []common.Address
-	PrecompiledAddressesIstanbul  []common.Address
-	PrecompiledAddressesByzantium []common.Address
-	PrecompiledAddressesHomestead []common.Address
+	PrecompiledAddressesVerkle       []common.Address
+	PrecompiledAddressesPrague       []common.Address
+	PrecompiledAddressesCancun       []common.Address
+	PrecompiledAddressesBerlin       []common.Address
+	PrecompiledAddressesIstanbul     []common.Address
+	PrecompiledAddressesByzantium    []common.Address
+	PrecompiledAddressesHomestead    []common.Address
+	PrecompiledAddressesCommonCoreV1 []common.Address
 )
 
 func init() {
@@ -168,6 +174,9 @@ func init() {
 	}
 	for k := range PrecompiledContractsPrague {
 		PrecompiledAddressesPrague = append(PrecompiledAddressesPrague, k)
+	}
+	for k := range PrecompiledContractsCommonCoreV1 {
+		PrecompiledAddressesCommonCoreV1 = append(PrecompiledAddressesCommonCoreV1, k)
 	}
 }
 
@@ -198,6 +207,8 @@ func ActivePrecompiledContracts(rules params.Rules) PrecompiledContracts {
 // ActivePrecompiles returns the precompile addresses enabled with the current configuration.
 func ActivePrecompiles(rules params.Rules) []common.Address {
 	switch {
+	case rules.IsCommonCoreV1:
+		return PrecompiledAddressesCommonCoreV1
 	case rules.IsPrague:
 		return PrecompiledAddressesPrague
 	case rules.IsCancun:
@@ -1181,4 +1192,29 @@ func kZGToVersionedHash(kzg kzg4844.Commitment) common.Hash {
 	h[0] = blobCommitmentVersionKZG
 
 	return h
+}
+
+// txIndex implements EIP-7793 TXINDEX precompile.
+type txIndex struct {
+	index uint
+}
+
+// RequiredGas returns the gas required to execute the TXINDEX precompile.
+func (c *txIndex) RequiredGas(input []byte) uint64 {
+	return params.TxIndexGas
+}
+
+// Run returns the transaction index within the current block.
+func (c *txIndex) Run(input []byte) ([]byte, error) {
+	// Encode the transaction index as a 4-byte big-endian integer
+	output := make([]byte, 4)
+	binary.BigEndian.PutUint32(output, uint32(c.index))
+
+	return output, nil
+}
+
+// SetEVM provides the contract with access to the EVM
+func (c *txIndex) SetEVM(evm *EVM) {
+	// Store the transaction index from the EVM's StateDB
+	c.index = uint(evm.StateDB.TxIndex())
 }
