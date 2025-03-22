@@ -400,30 +400,82 @@ func BenchmarkPrecompiledBLS12381G2MultiExpWorstCase(b *testing.B) {
 }
 
 func TestPrecompiledTxIndex(t *testing.T) {
-	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
+	// Basic test: verify the precompile returns the correct index
+	t.Run("Basic", func(t *testing.T) {
+		statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
+		statedb.SetTxContext(common.Hash{}, 42)
 
-	// Set a predefined transaction index (e.g., 42) in the StateDB
-	statedb.SetTxContext(common.Hash{}, 42)
+		env := NewEVM(BlockContext{
+			BlockNumber: big.NewInt(1),
+			Random:      &common.Hash{},
+			Time:        1,
+		}, statedb, params.MergedTestChainConfig, Config{})
 
-	env := NewEVM(BlockContext{
-		BlockNumber: big.NewInt(1),
-		Random:      &common.Hash{},
-		Time:        1,
-	}, statedb, params.MergedTestChainConfig, Config{})
+		// Create the txIndex precompile and set the EVM
+		txIndexPrecompile := &txIndex{}
+		txIndexPrecompile.SetEVM(env)
 
-	// Create the txIndex precompile and set the EVM
-	txIndexPrecompile := &txIndex{}
-	txIndexPrecompile.SetEVM(env)
+		result, err := txIndexPrecompile.Run(nil)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
 
-	result, err := txIndexPrecompile.Run(nil)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+		// Check the result
+		expected := []byte{0, 0, 0, 42} // 42 encoded as a 4-byte big-endian integer
+		if !bytes.Equal(result, expected) {
+			t.Errorf("Expected %v, got %v", expected, result)
+		}
+	})
 
-	// Check the result
-	expected := []byte{0, 0, 0, 42} // 42 encoded as a 4-byte big-endian integer
-	if !bytes.Equal(result, expected) {
-		t.Errorf("Expected %v, got %v", expected, result)
-	}
+	// Test index in a block with multiple transactions
+	t.Run("MultipleTransactionsInBlock", func(t *testing.T) {
+		statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
+
+		txContexts := []struct {
+			hash  common.Hash
+			index int
+		}{
+			{common.HexToHash("0xaaaa"), 0},
+			{common.HexToHash("0xbbbb"), 1},
+			{common.HexToHash("0xcccc"), 2},
+			{common.HexToHash("0xdddd"), 3},
+			{common.HexToHash("0xeeee"), 4},
+		}
+
+		// Test each transaction in the block
+		for _, tc := range txContexts {
+			// Set the transaction context in the state
+			statedb.SetTxContext(tc.hash, tc.index)
+
+			// Create EVM
+			env := NewEVM(BlockContext{
+				BlockNumber: big.NewInt(1),
+				Random:      &common.Hash{},
+				Time:        1,
+			}, statedb, params.MergedTestChainConfig, Config{})
+
+			// Create and set up the txIndex precompile
+			txIndexPrecompile := &txIndex{}
+			txIndexPrecompile.SetEVM(env)
+
+			// Run the precompile
+			result, err := txIndexPrecompile.Run(nil)
+			if err != nil {
+				t.Fatalf("Transaction index %d failed: %v", tc.index, err)
+			}
+
+			// Check the result - should be a 4-byte big-endian integer
+			expected := make([]byte, 4)
+			// Convert index to big-endian bytes
+			expected[3] = byte(tc.index)
+			expected[2] = byte(tc.index >> 8)
+			expected[1] = byte(tc.index >> 16)
+			expected[0] = byte(tc.index >> 24)
+
+			if !bytes.Equal(result, expected) {
+				t.Errorf("Transaction index mismatch for tx %v: expected %v, got %v", tc.hash, expected, result)
+			}
+		}
+	})
 
 }
