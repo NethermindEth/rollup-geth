@@ -47,12 +47,6 @@ type PrecompiledContract interface {
 	Run(input []byte) ([]byte, error) // Run runs the precompiled contract
 }
 
-// StatefulPrecompiledContract is a precompiled contract that requires access to the EVM state.
-type StatefulPrecompiledContract interface {
-	PrecompiledContract
-	SetEVM(evm *EVM) // SetEVM provides the contract with access to the EVM
-}
-
 // PrecompiledContracts contains the precompiled contracts supported at the given fork.
 type PrecompiledContracts map[common.Address]PrecompiledContract
 
