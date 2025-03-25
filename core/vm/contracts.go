@@ -142,7 +142,7 @@ var PrecompiledContractsBLS = PrecompiledContractsPrague
 var PrecompiledContractsVerkle = PrecompiledContractsPrague
 
 var PrecompiledContractsCommonCoreV1 = PrecompiledContracts{
-	common.BytesToAddress([]byte{}): &txIndex{},
+	common.BytesToAddress([]byte{0x0b}): &txIndex{},
 }
 
 var (
@@ -1214,7 +1214,6 @@ func (c *txIndex) Run(input []byte) ([]byte, error) {
 }
 
 // SetEVM provides the contract with access to the EVM
-func (c *txIndex) SetEVM(evm *EVM) {
-	// Store the transaction index from the EVM's StateDB
-	c.index = uint(evm.StateDB.TxIndex())
+func (c *txIndex) SetEVM(index uint) {
+	c.index = index
 }

@@ -20,15 +20,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
 )
 
 // precompiledTest defines the input/output pairs for precompiled contract tests.
@@ -405,15 +404,15 @@ func TestPrecompiledTxIndex(t *testing.T) {
 		statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
 		statedb.SetTxContext(common.Hash{}, 42)
 
-		env := NewEVM(BlockContext{
-			BlockNumber: big.NewInt(1),
-			Random:      &common.Hash{},
-			Time:        1,
-		}, statedb, params.MergedTestChainConfig, Config{})
+		// env := NewEVM(BlockContext{
+		// 	BlockNumber: big.NewInt(1),
+		// 	Random:      &common.Hash{},
+		// 	Time:        1,
+		// }, statedb, params.MergedTestChainConfig, Config{})
 
 		// Create the txIndex precompile and set the EVM
 		txIndexPrecompile := &txIndex{}
-		txIndexPrecompile.SetEVM(env)
+		txIndexPrecompile.SetEVM(uint(statedb.TxIndex()))
 
 		result, err := txIndexPrecompile.Run(nil)
 		if err != nil {
@@ -448,15 +447,15 @@ func TestPrecompiledTxIndex(t *testing.T) {
 			statedb.SetTxContext(tc.hash, tc.index)
 
 			// Create EVM
-			env := NewEVM(BlockContext{
-				BlockNumber: big.NewInt(1),
-				Random:      &common.Hash{},
-				Time:        1,
-			}, statedb, params.MergedTestChainConfig, Config{})
+			// env := NewEVM(BlockContext{
+			// 	BlockNumber: big.NewInt(1),
+			// 	Random:      &common.Hash{},
+			// 	Time:        1,
+			// }, statedb, params.MergedTestChainConfig, Config{})
 
 			// Create and set up the txIndex precompile
 			txIndexPrecompile := &txIndex{}
-			txIndexPrecompile.SetEVM(env)
+			txIndexPrecompile.SetEVM(uint(statedb.TxIndex()))
 
 			// Run the precompile
 			result, err := txIndexPrecompile.Run(nil)
@@ -471,7 +470,7 @@ func TestPrecompiledTxIndex(t *testing.T) {
 			expected[2] = byte(tc.index >> 8)
 			expected[1] = byte(tc.index >> 16)
 			expected[0] = byte(tc.index >> 24)
-
+			//expected = []byte{0, 0, 0, 2}
 			if !bytes.Equal(result, expected) {
 				t.Errorf("Transaction index mismatch for tx %v: expected %v, got %v", tc.hash, expected, result)
 			}
