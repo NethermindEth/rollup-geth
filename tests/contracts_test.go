@@ -78,7 +78,7 @@ func TestTxIndexer(t *testing.T) {
 	for i, receipt := range receipts[0] {
 		expected := make([]byte, 4)
 		binary.BigEndian.PutUint32(expected, uint32(i))
-		if !bytes.Equal(receipt.output, expected) {
+		if !bytes.Equal(receipt, expected) {
 			t.Errorf("transaction %d: expected output %x, got %x", i, expected, receipt)
 		}
 	}
