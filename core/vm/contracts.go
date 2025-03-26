@@ -1214,6 +1214,6 @@ func (c *txIndex) Run(input []byte) ([]byte, error) {
 }
 
 // SetEVM provides the contract with access to the EVM
-func (c *txIndex) SetEVM(index uint) {
+func (c *txIndex) SetIndex(index uint) {
 	c.index = index
 }
