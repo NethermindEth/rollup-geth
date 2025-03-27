@@ -88,3 +88,95 @@ func TestTxIndexer(t *testing.T) {
 	// 	}
 	// }
 }
+func TestTxIndexerV2(t *testing.T) {
+	testKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
+
+	testFunds := big.NewInt(1e18) // 1 ETH
+
+	gspec := &core.Genesis{
+		Config: params.TestChainConfig,
+		Alloc: core.GenesisAlloc{
+			testAddr: {Balance: testFunds},
+		},
+		BaseFee: big.NewInt(params.InitialBaseFee),
+	}
+
+	engine := ethash.NewFaker()
+
+	// Create 5 transactions for testing
+	numTxs := 5
+	nonce := uint64(0)
+	recipient := common.HexToAddress("0xpleasework")
+
+	// Address of the txIndex precompile
+	txPrecompileAddr := common.HexToAddress("0x0b")
+
+	_, blocks, _ := core.GenerateChainWithGenesis(gspec, engine, 1, func(i int, gen *core.BlockGen) {
+		for j := 0; j < numTxs; j++ {
+			tx := types.NewTransaction(
+				nonce,
+				recipient,
+				big.NewInt(1000),
+				params.TxGas,
+				big.NewInt(params.InitialBaseFee),
+				nil,
+			)
+			signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, testKey)
+			if err != nil {
+				t.Fatalf("failed to sign tx: %v", err)
+			}
+			gen.AddTx(signedTx)
+			nonce++
+		}
+	})
+
+	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
+
+	chainRules := params.MergedTestChainConfig.Rules(blocks[0].Number(), false, blocks[0].Time())
+
+	for i, tx := range blocks[0].Transactions() {
+		t.Run(fmt.Sprintf("Transaction_%d", i), func(t *testing.T) {
+			// Set the txn  context in the state
+			statedb.SetTxContext(tx.Hash(), i)
+
+			blockCtx := vm.BlockContext{
+				CanTransfer: core.CanTransfer,
+				Transfer:    core.Transfer,
+				BlockNumber: blocks[0].Number(),
+				Time:        blocks[0].Time(),
+				Difficulty:  blocks[0].Difficulty(),
+				GasLimit:    blocks[0].GasLimit(),
+				BaseFee:     blocks[0].BaseFee(),
+			}
+
+			evm := vm.NewEVM(blockCtx, statedb, params.MergedTestChainConfig, vm.Config{})
+			_ = evm
+
+			precompiles := vm.ActivePrecompiledContracts(chainRules)
+			txIndexPrecompile, exists := precompiles[txPrecompileAddr]
+			if !exists {
+				t.Fatalf("txIndex precompile not found at address %s", txPrecompileAddr.Hex())
+			}
+
+			input := []byte{}
+			gas := txIndexPrecompile.RequiredGas(input)
+
+			result, _, err := vm.RunPrecompiledContract(txIndexPrecompile, input, gas, nil)
+			if err != nil {
+				t.Fatalf("Failed to run txIndex precompile: %v", err)
+			}
+
+			expected := make([]byte, 4)
+			binary.BigEndian.PutUint32(expected, uint32(i))
+
+			if !bytes.Equal(result, expected) {
+				t.Errorf("Expected output %x, got %x", expected, result)
+			}
+		})
+	}
+
+}
