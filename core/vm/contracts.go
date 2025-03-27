@@ -182,6 +182,8 @@ func init() {
 
 func activePrecompiledContracts(rules params.Rules) PrecompiledContracts {
 	switch {
+	case rules.IsCommonCoreV1:
+		return PrecompiledContractsCommonCoreV1
 	case rules.IsVerkle:
 		return PrecompiledContractsVerkle
 	case rules.IsPrague:
@@ -207,8 +209,6 @@ func ActivePrecompiledContracts(rules params.Rules) PrecompiledContracts {
 // ActivePrecompiles returns the precompile addresses enabled with the current configuration.
 func ActivePrecompiles(rules params.Rules) []common.Address {
 	switch {
-	case rules.IsCommonCoreV1:
-		return PrecompiledAddressesCommonCoreV1
 	case rules.IsPrague:
 		return PrecompiledAddressesPrague
 	case rules.IsCancun:
