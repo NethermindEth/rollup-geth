@@ -1213,7 +1213,7 @@ func (c *txIndex) Run(input []byte) ([]byte, error) {
 	return output, nil
 }
 
-// SetEVM provides the contract with access to the EVM
+// SetIndex provides the contract with access to the transaction index
 func (c *txIndex) SetIndex(index uint) {
 	c.index = index
 }

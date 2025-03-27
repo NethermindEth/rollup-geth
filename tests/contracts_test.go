@@ -19,83 +19,29 @@ package tests
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/triedb"
 )
 
-// TestTxIndexer tests the functionalities for managing transaction indexes.
-func TestTxIndexer(t *testing.T) {
-	// Generate a test key and account.
-	testKey, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
-	// Fund the test account.
-	testFunds := big.NewInt(1e18) // 1 ETH
-
-	// Build a genesis specification.
-	gspec := &core.Genesis{
-		Config: params.TestChainConfig,
-		Alloc: core.GenesisAlloc{
-			testAddr: {Balance: testFunds},
-		},
-		// BaseFee is used in EIP-1559 blocks; for testing we use an initial value.
-		BaseFee: big.NewInt(params.InitialBaseFee),
-	}
-
-	// Use the ethash engine in faker mode for deterministic mining.
-	engine := ethash.NewFaker()
-
-	// We will create a single block with a 3 transactions.
-	numTxs := 3
-	nonce := uint64(0)
-
-	txPrecompileAddr := common.HexToAddress("0x0b")
-
-	_, _, receipts := core.GenerateChainWithGenesis(gspec, engine, numTxs, func(i int, gen *core.BlockGen) {
-		// Create a transaction that calls the txIndex precompile.
-		tx := types.NewTransaction(nonce, txPrecompileAddr, big.NewInt(0), params.TxGas, big.NewInt(10*params.InitialBaseFee), nil)
-		signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, testKey)
-		if err != nil {
-			t.Fatalf("failed to sign tx: %v", err)
-		}
-		gen.AddTx(signedTx)
-		nonce++
-	})
-
-	if len(receipts) != numTxs {
-		t.Fatalf("expected %d receipts, got %d", numTxs, len(receipts[0]))
-	}
-
-	for i, receipt := range receipts[0] {
-		expected := make([]byte, 4)
-		binary.BigEndian.PutUint32(expected, uint32(i))
-		if !bytes.Equal(receipt, expected) {
-			t.Errorf("transaction %d: expected output %x, got %x", i, expected, receipt)
-		}
-	}
-	// for i, receipt := range receipts[0] {
-	// 	if receipt.Status != types.ReceiptStatusSuccessful {
-	// 		t.Errorf("transaction %d: expected successful status", i)
-	// 	}
-	// }
-}
-func TestTxIndexerV2(t *testing.T) {
+func TestTXINDEXPrecompile(t *testing.T) {
 	testKey, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
 	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
 
-	testFunds := big.NewInt(1e18) // 1 ETH
+	testFunds := big.NewInt(1e18)
 
 	gspec := &core.Genesis{
 		Config: params.TestChainConfig,
@@ -107,15 +53,14 @@ func TestTxIndexerV2(t *testing.T) {
 
 	engine := ethash.NewFaker()
 
-	// Create 5 transactions for testing
 	numTxs := 5
 	nonce := uint64(0)
 	recipient := common.HexToAddress("0xpleasework")
 
-	// Address of the txIndex precompile
 	txPrecompileAddr := common.HexToAddress("0x0b")
 
-	_, blocks, _ := core.GenerateChainWithGenesis(gspec, engine, 1, func(i int, gen *core.BlockGen) {
+	// Generate the chain with transactions and get the database
+	db, blocks, _ := core.GenerateChainWithGenesis(gspec, engine, 1, func(i int, gen *core.BlockGen) {
 		for j := 0; j < numTxs; j++ {
 			tx := types.NewTransaction(
 				nonce,
@@ -134,13 +79,18 @@ func TestTxIndexerV2(t *testing.T) {
 		}
 	})
 
-	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
+	// Create a state database using the database returned from GenerateChainWithGenesis
+	trieDB := triedb.NewDatabase(db, triedb.HashDefaults)
+	statedb, err := state.New(blocks[0].Root(), state.NewDatabase(trieDB, nil))
+	if err != nil {
+		t.Fatalf("failed to create state database: %v", err)
+	}
 
 	chainRules := params.MergedTestChainConfig.Rules(blocks[0].Number(), false, blocks[0].Time())
 
 	for i, tx := range blocks[0].Transactions() {
 		t.Run(fmt.Sprintf("Transaction_%d", i), func(t *testing.T) {
-			// Set the txn  context in the state
+			// Set the transaction context for the specific transaction we're testing
 			statedb.SetTxContext(tx.Hash(), i)
 
 			blockCtx := vm.BlockContext{
@@ -178,5 +128,4 @@ func TestTxIndexerV2(t *testing.T) {
 			}
 		})
 	}
-
 }
