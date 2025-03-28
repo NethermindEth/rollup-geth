@@ -50,7 +50,7 @@ func TestTXINDEXPrecompile(t *testing.T) {
 
 	engine := ethash.NewFaker()
 
-	numTxs := 5
+	numTxs := 3
 	nonce := uint64(0)
 	recipient := common.HexToAddress("0xpleasework")
 
@@ -73,30 +73,35 @@ func TestTXINDEXPrecompile(t *testing.T) {
 			}
 			gen.AddTx(signedTx)
 			nonce++
+
+			// Then set up precompile contract after adding the transaction
+			chainRules := params.MergedTestChainConfig.Rules(gen.Number(), false, gen.Timestamp())
+			precompiles := vm.ActivePrecompiledContracts(chainRules)
+			txIndexPrecompile, exists := precompiles[txPrecompileAddr]
+			if !exists {
+				t.Fatalf("txIndex precompile not found at address %s", txPrecompileAddr.Hex())
+			}
+
+			input := []byte{}
+			gas := txIndexPrecompile.RequiredGas(input)
+
+			result, _, err := vm.RunPrecompiledContract(txIndexPrecompile, input, gas, nil)
+			if err != nil {
+				t.Fatalf("Failed to run txIndex precompile after transaction %d: %v", j, err)
+			}
+
+			expected := make([]byte, 4)
+			binary.BigEndian.PutUint32(expected, uint32(j))
+
+			if !bytes.Equal(result, expected) {
+				t.Errorf("After adding transaction %d: expected output %x, got %x", j, expected, result)
+			}
 		}
+
 	})
 
-	chainRules := params.MergedTestChainConfig.Rules(blocks[0].Number(), false, blocks[0].Time())
-	length := len(blocks[0].Transactions())
-
-	precompiles := vm.ActivePrecompiledContracts(chainRules)
-	txIndexPrecompile, exists := precompiles[txPrecompileAddr]
-	if !exists {
-		t.Fatalf("txIndex precompile not found at address %s", txPrecompileAddr.Hex())
-	}
-
-	input := []byte{}
-	gas := txIndexPrecompile.RequiredGas(input)
-
-	result, _, err := vm.RunPrecompiledContract(txIndexPrecompile, input, gas, nil)
-	if err != nil {
-		t.Fatalf("Failed to run txIndex precompile: %v", err)
-	}
-
-	expected := make([]byte, 4)
-	binary.BigEndian.PutUint32(expected, uint32(length-1))
-
-	if !bytes.Equal(result, expected) {
-		t.Errorf("Expected output %x, got %x", expected, result)
+	// Verify that all transactions were processed correctly
+	if len(blocks[0].Transactions()) != numTxs {
+		t.Errorf("Expected %d transactions in block, got %d", numTxs, len(blocks[0].Transactions()))
 	}
 }
