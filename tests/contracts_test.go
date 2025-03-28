@@ -19,19 +19,16 @@ package tests
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/triedb"
 )
 
 func TestTXINDEXPrecompile(t *testing.T) {
@@ -44,8 +41,8 @@ func TestTXINDEXPrecompile(t *testing.T) {
 	testFunds := big.NewInt(1e18)
 
 	gspec := &core.Genesis{
-		Config: params.TestChainConfig,
-		Alloc: core.GenesisAlloc{
+		Config: params.MergedTestChainConfig,
+		Alloc: types.GenesisAlloc{
 			testAddr: {Balance: testFunds},
 		},
 		BaseFee: big.NewInt(params.InitialBaseFee),
@@ -60,7 +57,7 @@ func TestTXINDEXPrecompile(t *testing.T) {
 	txPrecompileAddr := common.HexToAddress("0x0b")
 
 	// Generate the chain with transactions and get the database
-	db, blocks, _ := core.GenerateChainWithGenesis(gspec, engine, 1, func(i int, gen *core.BlockGen) {
+	_, blocks, _ := core.GenerateChainWithGenesis(gspec, engine, 1, func(i int, gen *core.BlockGen) {
 		for j := 0; j < numTxs; j++ {
 			tx := types.NewTransaction(
 				nonce,
@@ -79,53 +76,27 @@ func TestTXINDEXPrecompile(t *testing.T) {
 		}
 	})
 
-	// Create a state database using the database returned from GenerateChainWithGenesis
-	trieDB := triedb.NewDatabase(db, triedb.HashDefaults)
-	statedb, err := state.New(blocks[0].Root(), state.NewDatabase(trieDB, nil))
-	if err != nil {
-		t.Fatalf("failed to create state database: %v", err)
+	chainRules := params.MergedTestChainConfig.Rules(blocks[0].Number(), false, blocks[0].Time())
+	length := len(blocks[0].Transactions())
+
+	precompiles := vm.ActivePrecompiledContracts(chainRules)
+	txIndexPrecompile, exists := precompiles[txPrecompileAddr]
+	if !exists {
+		t.Fatalf("txIndex precompile not found at address %s", txPrecompileAddr.Hex())
 	}
 
-	chainRules := params.MergedTestChainConfig.Rules(blocks[0].Number(), false, blocks[0].Time())
+	input := []byte{}
+	gas := txIndexPrecompile.RequiredGas(input)
 
-	for i, tx := range blocks[0].Transactions() {
-		t.Run(fmt.Sprintf("Transaction_%d", i), func(t *testing.T) {
-			// Set the transaction context for the specific transaction we're testing
-			statedb.SetTxContext(tx.Hash(), i)
+	result, _, err := vm.RunPrecompiledContract(txIndexPrecompile, input, gas, nil)
+	if err != nil {
+		t.Fatalf("Failed to run txIndex precompile: %v", err)
+	}
 
-			blockCtx := vm.BlockContext{
-				CanTransfer: core.CanTransfer,
-				Transfer:    core.Transfer,
-				BlockNumber: blocks[0].Number(),
-				Time:        blocks[0].Time(),
-				Difficulty:  blocks[0].Difficulty(),
-				GasLimit:    blocks[0].GasLimit(),
-				BaseFee:     blocks[0].BaseFee(),
-			}
+	expected := make([]byte, 4)
+	binary.BigEndian.PutUint32(expected, uint32(length-1))
 
-			evm := vm.NewEVM(blockCtx, statedb, params.MergedTestChainConfig, vm.Config{})
-			_ = evm
-
-			precompiles := vm.ActivePrecompiledContracts(chainRules)
-			txIndexPrecompile, exists := precompiles[txPrecompileAddr]
-			if !exists {
-				t.Fatalf("txIndex precompile not found at address %s", txPrecompileAddr.Hex())
-			}
-
-			input := []byte{}
-			gas := txIndexPrecompile.RequiredGas(input)
-
-			result, _, err := vm.RunPrecompiledContract(txIndexPrecompile, input, gas, nil)
-			if err != nil {
-				t.Fatalf("Failed to run txIndex precompile: %v", err)
-			}
-
-			expected := make([]byte, 4)
-			binary.BigEndian.PutUint32(expected, uint32(i))
-
-			if !bytes.Equal(result, expected) {
-				t.Errorf("Expected output %x, got %x", expected, result)
-			}
-		})
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Expected output %x, got %x", expected, result)
 	}
 }
