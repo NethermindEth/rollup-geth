@@ -1196,7 +1196,7 @@ func kZGToVersionedHash(kzg kzg4844.Commitment) common.Hash {
 
 // txIndex implements EIP-7793 TXINDEX precompile.
 type txIndex struct {
-	index uint
+	indexFn func() int
 }
 
 // RequiredGas returns the gas required to execute the TXINDEX precompile.
@@ -1208,12 +1208,12 @@ func (c *txIndex) RequiredGas(input []byte) uint64 {
 func (c *txIndex) Run(input []byte) ([]byte, error) {
 	// Encode the transaction index as a 4-byte big-endian integer
 	output := make([]byte, 4)
-	binary.BigEndian.PutUint32(output, uint32(c.index))
+	binary.BigEndian.PutUint32(output, uint32(c.indexFn()))
 
 	return output, nil
 }
 
-// SetIndex provides the contract with access to the transaction index
-func (c *txIndex) SetIndex(index uint) {
-	c.index = index
+// SetIndexFn sets the function to retrieve the current transaction index
+func (c *txIndex) SetIndexFn(fn func() int) {
+	c.indexFn = fn
 }
