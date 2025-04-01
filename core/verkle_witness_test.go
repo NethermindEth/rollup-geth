@@ -113,6 +113,7 @@ func TestProcessVerkle(t *testing.T) {
 				params.HistoryStorageAddress:     {Nonce: 1, Code: params.HistoryStorageCode, Balance: common.Big0},
 				params.WithdrawalQueueAddress:    {Nonce: 1, Code: params.WithdrawalQueueCode, Balance: common.Big0},
 				params.ConsolidationQueueAddress: {Nonce: 1, Code: params.ConsolidationQueueCode, Balance: common.Big0},
+				params.L1OriginContractAddress:   {Nonce: 1, Code: params.L1OriginContractCode, Balance: common.Big0},
 			},
 		}
 	)
@@ -272,6 +273,10 @@ func getContractStoredBlockHash(statedb *state.StateDB, number uint64, isVerkle 
 		return statedb.GetState(params.HistoryStorageAddress, key)
 	}
 	return statedb.GetState(params.HistoryStorageAddress, key)
+}
+
+func TestL1BlockInfo(t *testing.T) {
+	// Todo: Test L1BlockInfo contract
 }
 
 // TestProcessVerkleInvalidContractCreation checks for several modes of contract creation failures
@@ -442,6 +447,7 @@ func verkleTestGenesis(config *params.ChainConfig) *Genesis {
 			params.HistoryStorageAddress:     {Nonce: 1, Code: params.HistoryStorageCode, Balance: common.Big0},
 			params.WithdrawalQueueAddress:    {Nonce: 1, Code: params.WithdrawalQueueCode, Balance: common.Big0},
 			params.ConsolidationQueueAddress: {Nonce: 1, Code: params.ConsolidationQueueCode, Balance: common.Big0},
+			params.L1OriginContractAddress:   {Nonce: 1, Code: params.L1OriginContractCode, Balance: common.Big0},
 		},
 	}
 }
