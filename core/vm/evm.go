@@ -143,7 +143,7 @@ func NewEVM(blockCtx BlockContext, statedb StateDB, chainConfig *params.ChainCon
 	evm.precompiles = activePrecompiledContracts(evm.chainRules)
 	// If txIndex precompile is activated, set its index directly
 	if txIdxPrecompile, ok := evm.precompiles[common.BytesToAddress([]byte{0x0b})].(*txIndex); ok {
-		txIdxPrecompile.SetIndexFn(func() int {
+		txIdxPrecompile.SetTxIndexFn(func() int {
 			return statedb.TxIndex()
 		})
 	}

@@ -406,7 +406,7 @@ func TestPrecompiledTxIndex(t *testing.T) {
 
 		// Create the txIndex precompile and set the EVM
 		txIndexPrecompile := &txIndex{}
-		txIndexPrecompile.SetIndexFn(func() int { return statedb.TxIndex() })
+		txIndexPrecompile.SetTxIndexFn(func() int { return statedb.TxIndex() })
 
 		result, err := txIndexPrecompile.Run(nil)
 		if err != nil {
@@ -442,7 +442,7 @@ func TestPrecompiledTxIndex(t *testing.T) {
 
 			// Create and set up the txIndex precompile
 			txIndexPrecompile := &txIndex{}
-			txIndexPrecompile.SetIndexFn(func() int { return statedb.TxIndex() })
+			txIndexPrecompile.SetTxIndexFn(func() int { return statedb.TxIndex() })
 
 			// Run the precompile
 			result, err := txIndexPrecompile.Run(nil)

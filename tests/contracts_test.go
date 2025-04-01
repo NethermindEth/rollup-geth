@@ -58,7 +58,7 @@ func TestTXINDEXPrecompile(t *testing.T) {
 
 	// Generate the chain with transactions and get the database
 	_, blocks, _ := core.GenerateChainWithGenesis(gspec, engine, 1, func(i int, gen *core.BlockGen) {
-		for j := 0; j < numTxs; j++ {
+		for txIndex := 0; txIndex < numTxs; txIndex++ {
 			tx := types.NewTransaction(
 				nonce,
 				recipient,
@@ -87,14 +87,14 @@ func TestTXINDEXPrecompile(t *testing.T) {
 
 			result, _, err := vm.RunPrecompiledContract(txIndexPrecompile, input, gas, nil)
 			if err != nil {
-				t.Fatalf("Failed to run txIndex precompile after transaction %d: %v", j, err)
+				t.Fatalf("Failed to run txIndex precompile after transaction %d: %v", txIndex, err)
 			}
 
 			expected := make([]byte, 4)
-			binary.BigEndian.PutUint32(expected, uint32(j))
+			binary.BigEndian.PutUint32(expected, uint32(txIndex))
 
 			if !bytes.Equal(result, expected) {
-				t.Errorf("After adding transaction %d: expected output %x, got %x", j, expected, result)
+				t.Errorf("After adding transaction %d: expected output %x, got %x", txIndex, expected, result)
 			}
 		}
 
