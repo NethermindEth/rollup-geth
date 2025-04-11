@@ -279,7 +279,7 @@ func getContractStoredBlockHash(statedb *state.StateDB, number uint64, isVerkle 
 func addToHash(hash common.Hash, offset byte) common.Hash {
 	result := common.Hash{}
 	copy(result[:], hash[:])
-	// Add offset to the last byte (simplistic but works for small offsets)
+	// Add offset to the last byte
 	result[31] += offset
 	return result
 }
