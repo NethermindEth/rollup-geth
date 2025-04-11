@@ -284,10 +284,10 @@ func addToHash(hash common.Hash, offset byte) common.Hash {
 	return result
 }
 
-func TestL1BlockInfo(t *testing.T) {
+func TestL1OriginSource(t *testing.T) {
 	// This test stores the L1 block information in the L1OriginSource contract
 	// by using the ProcessL1BlockInfo function.
-	checkL1BlockInfo := func(statedb *state.StateDB, isVerkle bool) {
+	checkL1OriginSource := func(statedb *state.StateDB, isVerkle bool) {
 		const maxStoredBlocks = 8192
 		const totalBlocks = 16
 
@@ -306,13 +306,12 @@ func TestL1BlockInfo(t *testing.T) {
 		// Store the L1 origin data for blocks 1 to totalBlocks
 		for i := 1; i <= totalBlocks; i++ {
 			header := &types.Header{
-				ParentHash: common.Hash{byte(i % 256)}, // Use modulo to fit in byte
+				ParentHash: common.Hash{byte(i % 256)},
 				Number:     big.NewInt(int64(i)),
 				Difficulty: new(big.Int),
 			}
 
 			// Create a mock L1 block info with a proper hash value
-			// Use Keccak256 to generate a proper hash for each block number
 			heightBytes := make([]byte, 8)
 			binary.BigEndian.PutUint64(heightBytes, uint64(i))
 			mockBlockHash := crypto.Keccak256Hash(heightBytes)
@@ -324,12 +323,12 @@ func TestL1BlockInfo(t *testing.T) {
 			parentBeaconRoot := crypto.Keccak256Hash(append([]byte("beacon"), heightBytes...))
 
 			l1OriginData := &L1OriginSource{
-				blockHash:        mockBlockHash,        // Proper hash for block
-				stateRoot:        stateRoot,            // Unique state root
-				receiptRoot:      receiptRoot,          // Unique receipt root
-				transactionRoot:  transactionRoot,      // Unique transaction root
-				blockHeight:      big.NewInt(int64(i)), // Block height
-				parentBeaconRoot: parentBeaconRoot,     // Unique beacon root
+				blockHash:        mockBlockHash,
+				stateRoot:        stateRoot,
+				receiptRoot:      receiptRoot,
+				transactionRoot:  transactionRoot,
+				blockHeight:      big.NewInt(int64(i)),
+				parentBeaconRoot: parentBeaconRoot,
 			}
 
 			// Set up chain config
@@ -346,7 +345,7 @@ func TestL1BlockInfo(t *testing.T) {
 
 			// Calculate storage slot for the buffer entry and verify the values
 			bufferIndex := uint64(i) % maxStoredBlocks
-			baseSlot := common.Hash{} // slot 0 for blockBuffer
+			baseSlot := common.Hash{}
 			indexBytes := make([]byte, 32)
 			binary.BigEndian.PutUint64(indexBytes[24:], bufferIndex)
 			structBaseSlot := crypto.Keccak256Hash(append(indexBytes, baseSlot[:]...))
@@ -399,10 +398,6 @@ func TestL1BlockInfo(t *testing.T) {
 				t.Errorf("block %d, height mismatch: got %v, want %v",
 					i, haveHeight, i)
 			}
-
-			if i%1000 == 0 {
-				t.Logf("Processed and verified block %d of %d", i, totalBlocks)
-			}
 		}
 
 		// Verify that blocks [1, overlapBlocks] are overwritten by blocks [maxStoredBlocks+1, totalBlocks]
@@ -449,7 +444,7 @@ func TestL1BlockInfo(t *testing.T) {
 
 	t.Run("MPT", func(t *testing.T) {
 		statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
-		checkL1BlockInfo(statedb, false)
+		checkL1OriginSource(statedb, false)
 	})
 
 	t.Run("Verkle", func(t *testing.T) {
@@ -458,7 +453,7 @@ func TestL1BlockInfo(t *testing.T) {
 		cacheConfig.SnapshotLimit = 0
 		triedb := triedb.NewDatabase(db, cacheConfig.triedbConfig(true))
 		statedb, _ := state.New(types.EmptyVerkleHash, state.NewDatabase(triedb, nil))
-		checkL1BlockInfo(statedb, true)
+		checkL1OriginSource(statedb, true)
 	})
 }
 
