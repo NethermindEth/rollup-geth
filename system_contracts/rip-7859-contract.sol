@@ -35,19 +35,16 @@ contract L1Origin is L1OriginSource {
     uint256 private constant MAX_STORED_BLOCKS = 8192;
 
     // Circular buffer of block data
-    L1BlockData[MAX_STORED_BLOCKS] private blockBuffer;
+    mapping(uint256 => L1BlockData) private blockData;
 
     // Current L1 block height
     uint256 private currentL1BlockHeight;
 
-    // Default block height value for uninitialized slots
-    uint256 private constant EMPTY_BLOCK_HEIGHT = 0;
-
     // Fixed system address that can update the L1 data
     address public constant SYSTEM_ADDRESS = 0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE;
 
-    // Events
-    event L1DataUpdated(uint256 indexed height, bytes32 blockHash);
+    // Events                                                                                                         .. 
+    event L1DataUpdated(uint256 indexed height, bytes32 blockHash);     
 
     /**
      * @dev Restricts function to the system address
@@ -79,7 +76,7 @@ contract L1Origin is L1OriginSource {
         // Store in the buffer using modulo to get the buffer index
         uint256 bufferIndex = height % MAX_STORED_BLOCKS;
 
-        blockBuffer[bufferIndex] = L1BlockData({
+        blockData[bufferIndex] = L1BlockData({
             blockHash: blockHash,
             parentBeaconRoot: parentBeaconRoot,
             stateRoot: stateRoot,
@@ -96,17 +93,17 @@ contract L1Origin is L1OriginSource {
         emit L1DataUpdated(height, blockHash);
     }
 
-
     /**
      * @dev Get block data by height, internal function
      */
     function _getBlockDataAt(uint256 height) private view returns (L1BlockData storage) {
         require(height > 0, "L1Origin: height cannot be zero");
+        require(height <= currentL1BlockHeight, "L1Origin: block height too high");
         uint256 bufferIndex = height % MAX_STORED_BLOCKS;
         // Check that the buffer contains the requested height
-        require(blockBuffer[bufferIndex].blockHeight == height, 
+        require(blockData[bufferIndex].blockHeight == height, 
                 "L1Origin: block data not found or overwritten");
-        return blockBuffer[bufferIndex];
+        return blockData[bufferIndex];
     }
 
     function getL1OriginBlockHash() external view override returns (bytes32 blockHash) {

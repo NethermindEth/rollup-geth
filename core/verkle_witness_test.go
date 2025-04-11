@@ -275,8 +275,191 @@ func getContractStoredBlockHash(statedb *state.StateDB, number uint64, isVerkle 
 	return statedb.GetState(params.HistoryStorageAddress, key)
 }
 
+// addToHash takes a base hash and adds an offset to it (for calculating struct field slots)
+func addToHash(hash common.Hash, offset byte) common.Hash {
+	result := common.Hash{}
+	copy(result[:], hash[:])
+	// Add offset to the last byte (simplistic but works for small offsets)
+	result[31] += offset
+	return result
+}
+
 func TestL1BlockInfo(t *testing.T) {
-	// Todo: Test L1BlockInfo contract
+	// This test stores the L1 block information in the L1OriginSource contract
+	// by using the ProcessL1BlockInfo function.
+	checkL1BlockInfo := func(statedb *state.StateDB, isVerkle bool) {
+		const maxStoredBlocks = 8192
+		const totalBlocks = 16
+
+		statedb.SetNonce(params.L1OriginContractAddress, 1, tracing.NonceChangeUnspecified)
+		statedb.SetCode(params.L1OriginContractAddress, params.L1OriginContractCode)
+
+		// Calculate the number of blocks that will overwrite older blocks, if there are more than maxStoredBlocks
+		overlapBlocks := 0
+		if totalBlocks > maxStoredBlocks {
+			overlapBlocks = totalBlocks - maxStoredBlocks
+		}
+
+		t.Logf("Testing with %d total blocks, %d max stored blocks, %d overlap blocks",
+			totalBlocks, maxStoredBlocks, overlapBlocks)
+
+		// Store the L1 origin data for blocks 1 to totalBlocks
+		for i := 1; i <= totalBlocks; i++ {
+			header := &types.Header{
+				ParentHash: common.Hash{byte(i % 256)}, // Use modulo to fit in byte
+				Number:     big.NewInt(int64(i)),
+				Difficulty: new(big.Int),
+			}
+
+			// Create a mock L1 block info with a proper hash value
+			// Use Keccak256 to generate a proper hash for each block number
+			heightBytes := make([]byte, 8)
+			binary.BigEndian.PutUint64(heightBytes, uint64(i))
+			mockBlockHash := crypto.Keccak256Hash(heightBytes)
+
+			// Generate other roots using different prefixes to ensure uniqueness
+			stateRoot := crypto.Keccak256Hash(append([]byte("state"), heightBytes...))
+			receiptRoot := crypto.Keccak256Hash(append([]byte("receipt"), heightBytes...))
+			transactionRoot := crypto.Keccak256Hash(append([]byte("transaction"), heightBytes...))
+			parentBeaconRoot := crypto.Keccak256Hash(append([]byte("beacon"), heightBytes...))
+
+			l1OriginData := &L1OriginSource{
+				blockHash:        mockBlockHash,        // Proper hash for block
+				stateRoot:        stateRoot,            // Unique state root
+				receiptRoot:      receiptRoot,          // Unique receipt root
+				transactionRoot:  transactionRoot,      // Unique transaction root
+				blockHeight:      big.NewInt(int64(i)), // Block height
+				parentBeaconRoot: parentBeaconRoot,     // Unique beacon root
+			}
+
+			// Set up chain config
+			chainConfig := params.MergedTestChainConfig
+			if isVerkle {
+				chainConfig = testVerkleChainConfig
+			}
+
+			vmContext := NewEVMBlockContext(header, nil, new(common.Address))
+			evm := vm.NewEVM(vmContext, statedb, chainConfig, vm.Config{})
+
+			// Process the L1 block info, which should store it in the contract
+			ProcessL1BlockInfo(l1OriginData, evm)
+
+			// Calculate storage slot for the buffer entry and verify the values
+			bufferIndex := uint64(i) % maxStoredBlocks
+			baseSlot := common.Hash{} // slot 0 for blockBuffer
+			indexBytes := make([]byte, 32)
+			binary.BigEndian.PutUint64(indexBytes[24:], bufferIndex)
+			structBaseSlot := crypto.Keccak256Hash(append(indexBytes, baseSlot[:]...))
+
+			// Verify blockHash
+			blockHashSlot := structBaseSlot
+			haveBlockHash := statedb.GetState(params.L1OriginContractAddress, blockHashSlot)
+			if haveBlockHash != mockBlockHash {
+				t.Errorf("block %d, blockHash mismatch: got %v, want %v",
+					i, haveBlockHash, mockBlockHash)
+			}
+
+			// Verify parentBeaconRoot
+			beaconRootSlot := addToHash(structBaseSlot, 1)
+			haveBeaconRoot := statedb.GetState(params.L1OriginContractAddress, beaconRootSlot)
+			if haveBeaconRoot != parentBeaconRoot {
+				t.Errorf("block %d, parentBeaconRoot mismatch: got %v, want %v",
+					i, haveBeaconRoot, parentBeaconRoot)
+			}
+
+			// Verify stateRoot
+			stateRootSlot := addToHash(structBaseSlot, 2)
+			haveStateRoot := statedb.GetState(params.L1OriginContractAddress, stateRootSlot)
+			if haveStateRoot != stateRoot {
+				t.Errorf("block %d, stateRoot mismatch: got %v, want %v",
+					i, haveStateRoot, stateRoot)
+			}
+
+			// Verify receiptRoot
+			receiptRootSlot := addToHash(structBaseSlot, 3)
+			haveReceiptRoot := statedb.GetState(params.L1OriginContractAddress, receiptRootSlot)
+			if haveReceiptRoot != receiptRoot {
+				t.Errorf("block %d, receiptRoot mismatch: got %v, want %v",
+					i, haveReceiptRoot, receiptRoot)
+			}
+
+			// Verify transactionRoot
+			transactionRootSlot := addToHash(structBaseSlot, 4)
+			haveTransactionRoot := statedb.GetState(params.L1OriginContractAddress, transactionRootSlot)
+			if haveTransactionRoot != transactionRoot {
+				t.Errorf("block %d, transactionRoot mismatch: got %v, want %v",
+					i, haveTransactionRoot, transactionRoot)
+			}
+
+			// Verify blockHeight
+			heightSlot := addToHash(structBaseSlot, 5)
+			haveHeightBytes := statedb.GetState(params.L1OriginContractAddress, heightSlot)
+			haveHeight := new(big.Int).SetBytes(haveHeightBytes[:])
+			if haveHeight.Cmp(big.NewInt(int64(i))) != 0 {
+				t.Errorf("block %d, height mismatch: got %v, want %v",
+					i, haveHeight, i)
+			}
+
+			if i%1000 == 0 {
+				t.Logf("Processed and verified block %d of %d", i, totalBlocks)
+			}
+		}
+
+		// Verify that blocks [1, overlapBlocks] are overwritten by blocks [maxStoredBlocks+1, totalBlocks]
+		for i := 1; i <= overlapBlocks; i++ {
+			bufferIndex := uint64(i) % maxStoredBlocks
+			baseSlot := common.Hash{}
+			indexBytes := make([]byte, 32)
+			binary.BigEndian.PutUint64(indexBytes[24:], bufferIndex)
+			structBaseSlot := crypto.Keccak256Hash(append(indexBytes, baseSlot[:]...))
+
+			// Check block height to verify if the slot contains the old block
+			heightSlot := addToHash(structBaseSlot, 5)
+			haveHeightBytes := statedb.GetState(params.L1OriginContractAddress, heightSlot)
+			haveHeight := new(big.Int).SetBytes(haveHeightBytes[:])
+
+			// The slot should contain a newer block (i + maxStoredBlocks)
+			wantHeight := big.NewInt(int64(i + maxStoredBlocks))
+			if haveHeight.Cmp(wantHeight) != 0 {
+				t.Errorf("block %d, height mismatch after overwrite: got %v, want %v",
+					i, haveHeight, wantHeight)
+			}
+		}
+
+		// Verify the blocks in [overlapBlocks+1, maxStoredBlocks] remain unchanged
+		for i := overlapBlocks + 1; i <= maxStoredBlocks && i <= totalBlocks; i++ {
+			bufferIndex := uint64(i) % maxStoredBlocks
+			baseSlot := common.Hash{}
+			indexBytes := make([]byte, 32)
+			binary.BigEndian.PutUint64(indexBytes[24:], bufferIndex)
+			structBaseSlot := crypto.Keccak256Hash(append(indexBytes, baseSlot[:]...))
+
+			// Check block height
+			heightSlot := addToHash(structBaseSlot, 5)
+			haveHeightBytes := statedb.GetState(params.L1OriginContractAddress, heightSlot)
+			haveHeight := new(big.Int).SetBytes(haveHeightBytes[:])
+
+			wantHeight := big.NewInt(int64(i))
+			if haveHeight.Cmp(wantHeight) != 0 {
+				t.Errorf("block %d, height mismatch for unchanged block: got %v, want %v",
+					i, haveHeight, wantHeight)
+			}
+		}
+	}
+
+	t.Run("MPT", func(t *testing.T) {
+		statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
+		checkL1BlockInfo(statedb, false)
+	})
+
+	t.Run("Verkle", func(t *testing.T) {
+		db := rawdb.NewMemoryDatabase()
+		cacheConfig := DefaultCacheConfigWithScheme(rawdb.PathScheme)
+		cacheConfig.SnapshotLimit = 0
+		triedb := triedb.NewDatabase(db, cacheConfig.triedbConfig(true))
+		statedb, _ := state.New(types.EmptyVerkleHash, state.NewDatabase(triedb, nil))
+		checkL1BlockInfo(statedb, true)
+	})
 }
 
 // TestProcessVerkleInvalidContractCreation checks for several modes of contract creation failures

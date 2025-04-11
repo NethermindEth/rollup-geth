@@ -60,6 +60,7 @@ type L1OriginSource struct {
 // Bytes encodes the L1OriginSource data into a byte slice for processing by the L1Origin contract.
 // It encodes the function signature for updateL1BlockData followed by the parameters.
 func (l *L1OriginSource) Bytes() []byte {
+	//return common.FromHex("0x856d71b90000000000000000000000000000000000000000000000000000000000000001c89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc66bcaf047ba4c8ac400fca43393035242dd1aabda2d6068a0c51242b97224de8d7880aec93413f117ef14bd4e6d130875ab2c7d7d55a064fac3c2f7bd51516380f4c2b5de886427473655d4c904c743576dc2d53249b7535d96c06cc97ae7216b933c48a61c3bad621ebc5d57117f9e773fefae4468bceaf9d3198a3bf7c1d678")
 	// Function signature: updateL1BlockData(uint256,bytes32,bytes32,bytes32,bytes32,bytes32)
 	methodID := crypto.Keccak256([]byte("updateL1BlockData(uint256,bytes32,bytes32,bytes32,bytes32,bytes32)"))[0:4]
 
@@ -313,6 +314,7 @@ func ProcessL1BlockInfo(l1OriginSource *L1OriginSource, evm *vm.EVM) {
 			defer tracer.OnSystemCallEnd()
 		}
 	}
+
 	msg := &Message{
 		From:      params.SystemAddress,
 		GasLimit:  30_000_000,
@@ -322,12 +324,15 @@ func ProcessL1BlockInfo(l1OriginSource *L1OriginSource, evm *vm.EVM) {
 		To:        &params.L1OriginContractAddress,
 		Data:      l1OriginSource.Bytes(),
 	}
+
 	evm.SetTxContext(NewEVMTxContext(msg))
 	evm.StateDB.AddAddressToAccessList(params.L1OriginContractAddress)
-	_, _, err := evm.Call(msg.From, *msg.To, msg.Data, 30_000_000, common.U2560)
+	_, _, err := evm.Call(msg.From, *msg.To, msg.Data, msg.GasLimit, common.U2560)
+
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("failed to process L1 block info: %v", err))
 	}
+
 	if evm.StateDB.AccessEvents() != nil {
 		evm.StateDB.AccessEvents().Merge(evm.AccessEvents)
 	}
