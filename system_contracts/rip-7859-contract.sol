@@ -17,11 +17,11 @@ interface L1OriginSource {
 }
 
 /**
- * @title L1Origin
+ * @title L1OriginSourceImpl
  * @dev Implementation of the L1OriginSource interface that stores L1 block data
  * using a circular buffer of 8192 blocks
  */
-contract L1Origin is L1OriginSource {
+contract L1OriginSourceImpl is L1OriginSource {
     struct L1BlockData {
         bytes32 blockHash;
         bytes32 parentBeaconRoot;
@@ -50,7 +50,7 @@ contract L1Origin is L1OriginSource {
      * @dev Restricts function to the system address
      */
     modifier onlySystem() {
-        require(msg.sender == SYSTEM_ADDRESS, "L1Origin: caller is not the system address");
+        require(msg.sender == SYSTEM_ADDRESS, "L1OriginSourceImpl: caller is not the system address");
         _;
     }
 
@@ -71,7 +71,7 @@ contract L1Origin is L1OriginSource {
         bytes32 receiptRoot,
         bytes32 transactionRoot
     ) external onlySystem {
-        require(height > 0, "L1Origin: height cannot be zero");
+        require(height > 0, "L1OriginSourceImpl: height cannot be zero");
 
         // Store in the buffer using modulo to get the buffer index
         uint256 bufferIndex = height % MAX_STORED_BLOCKS;
@@ -97,37 +97,37 @@ contract L1Origin is L1OriginSource {
      * @dev Get block data by height, internal function
      */
     function _getBlockDataAt(uint256 height) private view returns (L1BlockData storage) {
-        require(height > 0, "L1Origin: height cannot be zero");
-        require(height <= currentL1BlockHeight, "L1Origin: block height too high");
+        require(height > 0, "L1OriginSourceImpl: height cannot be zero");
+        require(height <= currentL1BlockHeight, "L1OriginSourceImpl: block height too high");
         uint256 bufferIndex = height % MAX_STORED_BLOCKS;
         // Check that the buffer contains the requested height
         require(blockData[bufferIndex].blockHeight == height, 
-                "L1Origin: block data not found or overwritten");
+                "L1OriginSourceImpl: block data not found or overwritten");
         return blockData[bufferIndex];
     }
 
     function getL1OriginBlockHash() external view override returns (bytes32 blockHash) {
-        require(currentL1BlockHeight > 0, "L1Origin: no L1 blocks available");
+        require(currentL1BlockHeight > 0, "L1OriginSourceImpl: no L1 blocks available");
         return _getBlockDataAt(currentL1BlockHeight).blockHash;
     }
 
     function getL1OriginParentBeaconRoot() external view override returns (bytes32 blockHash) {
-        require(currentL1BlockHeight > 0, "L1Origin: no L1 blocks available");
+        require(currentL1BlockHeight > 0, "L1OriginSourceImpl: no L1 blocks available");
         return _getBlockDataAt(currentL1BlockHeight).parentBeaconRoot;
     }
 
     function getL1OriginStateRoot() external view override returns (bytes32 stateRoot) {
-        require(currentL1BlockHeight > 0, "L1Origin: no L1 blocks available");
+        require(currentL1BlockHeight > 0, "L1OriginSourceImpl: no L1 blocks available");
         return _getBlockDataAt(currentL1BlockHeight).stateRoot;
     }
 
     function getL1OriginReceiptRoot() external view override returns (bytes32 receiptRoot) {
-        require(currentL1BlockHeight > 0, "L1Origin: no L1 blocks available");
+        require(currentL1BlockHeight > 0, "L1OriginSourceImpl: no L1 blocks available");
         return _getBlockDataAt(currentL1BlockHeight).receiptRoot;
     }
 
     function getL1OriginTransactionRoot() external view override returns (bytes32 transactionRoot) {
-        require(currentL1BlockHeight > 0, "L1Origin: no L1 blocks available");
+        require(currentL1BlockHeight > 0, "L1OriginSourceImpl: no L1 blocks available");
         return _getBlockDataAt(currentL1BlockHeight).transactionRoot;
     }
 

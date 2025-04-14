@@ -296,7 +296,7 @@ func verifyStructField(t *testing.T, statedb *state.StateDB, structBaseSlot comm
 
 func TestL1OriginSource(t *testing.T) {
 	// This test stores the L1 block information in the L1OriginSource contract
-	// by using the ProcessL1BlockInfo function.
+	// and reads it back from the statedb to verify the values.
 	checkL1OriginSource := func(statedb *state.StateDB, isVerkle bool) {
 		const maxStoredBlocks = 8192
 		const totalBlocks = 9000
@@ -312,7 +312,7 @@ func TestL1OriginSource(t *testing.T) {
 				Difficulty: new(big.Int),
 			}
 
-			// Create a mock L1 block info with a proper hash value
+			// Create a mock L1 block info
 			heightBytes := make([]byte, 8)
 			binary.BigEndian.PutUint64(heightBytes, uint64(i))
 			mockBlockHash := crypto.Keccak256Hash(heightBytes)
@@ -342,7 +342,7 @@ func TestL1OriginSource(t *testing.T) {
 			evm := vm.NewEVM(vmContext, statedb, chainConfig, vm.Config{})
 
 			// Process the L1 block info, which should store it in the contract
-			ProcessL1BlockInfo(l1OriginData, evm)
+			ProcessL1OriginBlockInfo(l1OriginData, evm)
 
 			// Calculate storage slot for the buffer entry and verify the values
 			bufferIndex := uint64(i) % maxStoredBlocks
@@ -374,7 +374,7 @@ func TestL1OriginSource(t *testing.T) {
 			binary.BigEndian.PutUint64(indexBytes[24:], bufferIndex)
 			structBaseSlot := crypto.Keccak256Hash(append(indexBytes, baseSlot[:]...))
 
-			// Check block height to verify if the slot contains the old block
+			// Check block height to verify if its updated with the new block height
 			verifyStructField(t, statedb, structBaseSlot, 5, common.BigToHash(big.NewInt(int64(maxStoredBlocks+i))))
 		}
 

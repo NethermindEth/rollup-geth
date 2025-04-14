@@ -47,7 +47,7 @@ func NewStateProcessor(config *params.ChainConfig, chain *HeaderChain) *StatePro
 	}
 }
 
-// L1OriginSource is a system contract to expose L1 origin data based on RIP-7859.
+// Data for the L1OriginSource system  contract (RIP-7859).
 type L1OriginSource struct {
 	blockHash        common.Hash
 	parentBeaconRoot common.Hash
@@ -57,32 +57,20 @@ type L1OriginSource struct {
 	blockHeight      *big.Int
 }
 
-// Bytes encodes the L1OriginSource data into a byte slice for processing by the L1Origin contract.
-// It encodes the function signature for updateL1BlockData followed by the parameters.
-func (l *L1OriginSource) Bytes() []byte {
+// Encodes the system contract function call to update the L1OriginSource data.
+func (l *L1OriginSource) UpdateL1OriginSourceCallData() []byte {
 	// Function signature: updateL1BlockData(uint256,bytes32,bytes32,bytes32,bytes32,bytes32)
 	methodID := crypto.Keccak256([]byte("updateL1BlockData(uint256,bytes32,bytes32,bytes32,bytes32,bytes32)"))[0:4]
 
 	data := make([]byte, 4+32*6) // 4 bytes for method ID + 6 parameters of 32 bytes each
 	copy(data[0:4], methodID)
 
-	// Pack the height parameter (uint256)
 	heightBytes := common.LeftPadBytes(l.blockHeight.Bytes(), 32)
 	copy(data[4:36], heightBytes)
-
-	// Pack the block hash (bytes32)
 	copy(data[36:68], l.blockHash[:])
-
-	// Pack the parent beacon root (bytes32)
 	copy(data[68:100], l.parentBeaconRoot[:])
-
-	// Pack the state root (bytes32)
 	copy(data[100:132], l.stateRoot[:])
-
-	// Pack the receipt root (bytes32)
 	copy(data[132:164], l.receiptRoot[:])
-
-	// Pack the transaction root (bytes32)
 	copy(data[164:196], l.transactionRoot[:])
 
 	return data
@@ -304,9 +292,9 @@ func ProcessParentBlockHash(prevHash common.Hash, evm *vm.EVM) {
 	evm.StateDB.Finalise(true)
 }
 
-// ProcessL1BlockInfo stores the L1 block info in the L1OriginSource contract
-// as per RIP-7859.
-func ProcessL1BlockInfo(l1OriginSource *L1OriginSource, evm *vm.EVM) {
+// ProcessL1OriginBlockInfo stores the L1 block info in the L1OriginSource contract
+// as defined in RIP-7859.
+func ProcessL1OriginBlockInfo(l1OriginSource *L1OriginSource, evm *vm.EVM) {
 	if tracer := evm.Config.Tracer; tracer != nil {
 		onSystemCallStart(tracer, evm.GetVMContext())
 		if tracer.OnSystemCallEnd != nil {
@@ -321,7 +309,7 @@ func ProcessL1BlockInfo(l1OriginSource *L1OriginSource, evm *vm.EVM) {
 		GasFeeCap: common.Big0,
 		GasTipCap: common.Big0,
 		To:        &params.L1OriginContractAddress,
-		Data:      l1OriginSource.Bytes(),
+		Data:      l1OriginSource.UpdateL1OriginSourceCallData(),
 	}
 
 	evm.SetTxContext(NewEVMTxContext(msg))
