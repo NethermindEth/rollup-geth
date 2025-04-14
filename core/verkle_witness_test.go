@@ -277,11 +277,21 @@ func getContractStoredBlockHash(statedb *state.StateDB, number uint64, isVerkle 
 
 // addToHash takes a base hash and adds an offset to it (for calculating struct field slots)
 func addToHash(hash common.Hash, offset byte) common.Hash {
+	// Convert hash to big.Int and then add the offset
+	hashInt := new(big.Int).SetBytes(hash[:])
+	hashInt.Add(hashInt, big.NewInt(int64(offset)))
+	// Return in the hash format
 	result := common.Hash{}
-	copy(result[:], hash[:])
-	// Add offset to the last byte
-	result[31] += offset
+	hashInt.FillBytes(result[:])
 	return result
+}
+
+func verifyStructField(t *testing.T, statedb *state.StateDB, structBaseSlot common.Hash, offset byte, want common.Hash) {
+	slot := addToHash(structBaseSlot, offset)
+	have := statedb.GetState(params.L1OriginContractAddress, slot)
+	if have != want {
+		t.Errorf("struct field %d mismatch: got %v, want %v", offset, have, want)
+	}
 }
 
 func TestL1OriginSource(t *testing.T) {
@@ -289,19 +299,10 @@ func TestL1OriginSource(t *testing.T) {
 	// by using the ProcessL1BlockInfo function.
 	checkL1OriginSource := func(statedb *state.StateDB, isVerkle bool) {
 		const maxStoredBlocks = 8192
-		const totalBlocks = 16
+		const totalBlocks = 9000
 
 		statedb.SetNonce(params.L1OriginContractAddress, 1, tracing.NonceChangeUnspecified)
 		statedb.SetCode(params.L1OriginContractAddress, params.L1OriginContractCode)
-
-		// Calculate the number of blocks that will overwrite older blocks, if there are more than maxStoredBlocks
-		overlapBlocks := 0
-		if totalBlocks > maxStoredBlocks {
-			overlapBlocks = totalBlocks - maxStoredBlocks
-		}
-
-		t.Logf("Testing with %d total blocks, %d max stored blocks, %d overlap blocks",
-			totalBlocks, maxStoredBlocks, overlapBlocks)
 
 		// Store the L1 origin data for blocks 1 to totalBlocks
 		for i := 1; i <= totalBlocks; i++ {
@@ -350,54 +351,19 @@ func TestL1OriginSource(t *testing.T) {
 			binary.BigEndian.PutUint64(indexBytes[24:], bufferIndex)
 			structBaseSlot := crypto.Keccak256Hash(append(indexBytes, baseSlot[:]...))
 
-			// Verify blockHash
-			blockHashSlot := structBaseSlot
-			haveBlockHash := statedb.GetState(params.L1OriginContractAddress, blockHashSlot)
-			if haveBlockHash != mockBlockHash {
-				t.Errorf("block %d, blockHash mismatch: got %v, want %v",
-					i, haveBlockHash, mockBlockHash)
-			}
+			// Verify the values based on the same order as defined in the L1OriginSource struct
+			verifyStructField(t, statedb, structBaseSlot, 0, mockBlockHash)
+			verifyStructField(t, statedb, structBaseSlot, 1, parentBeaconRoot)
+			verifyStructField(t, statedb, structBaseSlot, 2, stateRoot)
+			verifyStructField(t, statedb, structBaseSlot, 3, receiptRoot)
+			verifyStructField(t, statedb, structBaseSlot, 4, transactionRoot)
+			verifyStructField(t, statedb, structBaseSlot, 5, common.BigToHash(big.NewInt(int64(i))))
+		}
 
-			// Verify parentBeaconRoot
-			beaconRootSlot := addToHash(structBaseSlot, 1)
-			haveBeaconRoot := statedb.GetState(params.L1OriginContractAddress, beaconRootSlot)
-			if haveBeaconRoot != parentBeaconRoot {
-				t.Errorf("block %d, parentBeaconRoot mismatch: got %v, want %v",
-					i, haveBeaconRoot, parentBeaconRoot)
-			}
-
-			// Verify stateRoot
-			stateRootSlot := addToHash(structBaseSlot, 2)
-			haveStateRoot := statedb.GetState(params.L1OriginContractAddress, stateRootSlot)
-			if haveStateRoot != stateRoot {
-				t.Errorf("block %d, stateRoot mismatch: got %v, want %v",
-					i, haveStateRoot, stateRoot)
-			}
-
-			// Verify receiptRoot
-			receiptRootSlot := addToHash(structBaseSlot, 3)
-			haveReceiptRoot := statedb.GetState(params.L1OriginContractAddress, receiptRootSlot)
-			if haveReceiptRoot != receiptRoot {
-				t.Errorf("block %d, receiptRoot mismatch: got %v, want %v",
-					i, haveReceiptRoot, receiptRoot)
-			}
-
-			// Verify transactionRoot
-			transactionRootSlot := addToHash(structBaseSlot, 4)
-			haveTransactionRoot := statedb.GetState(params.L1OriginContractAddress, transactionRootSlot)
-			if haveTransactionRoot != transactionRoot {
-				t.Errorf("block %d, transactionRoot mismatch: got %v, want %v",
-					i, haveTransactionRoot, transactionRoot)
-			}
-
-			// Verify blockHeight
-			heightSlot := addToHash(structBaseSlot, 5)
-			haveHeightBytes := statedb.GetState(params.L1OriginContractAddress, heightSlot)
-			haveHeight := new(big.Int).SetBytes(haveHeightBytes[:])
-			if haveHeight.Cmp(big.NewInt(int64(i))) != 0 {
-				t.Errorf("block %d, height mismatch: got %v, want %v",
-					i, haveHeight, i)
-			}
+		// Calculate the number of blocks that will overwrite older blocks, if there are more than maxStoredBlocks
+		overlapBlocks := 0
+		if totalBlocks > maxStoredBlocks {
+			overlapBlocks = totalBlocks - maxStoredBlocks
 		}
 
 		// Verify that blocks [1, overlapBlocks] are overwritten by blocks [maxStoredBlocks+1, totalBlocks]
@@ -409,16 +375,7 @@ func TestL1OriginSource(t *testing.T) {
 			structBaseSlot := crypto.Keccak256Hash(append(indexBytes, baseSlot[:]...))
 
 			// Check block height to verify if the slot contains the old block
-			heightSlot := addToHash(structBaseSlot, 5)
-			haveHeightBytes := statedb.GetState(params.L1OriginContractAddress, heightSlot)
-			haveHeight := new(big.Int).SetBytes(haveHeightBytes[:])
-
-			// The slot should contain a newer block (i + maxStoredBlocks)
-			wantHeight := big.NewInt(int64(i + maxStoredBlocks))
-			if haveHeight.Cmp(wantHeight) != 0 {
-				t.Errorf("block %d, height mismatch after overwrite: got %v, want %v",
-					i, haveHeight, wantHeight)
-			}
+			verifyStructField(t, statedb, structBaseSlot, 5, common.BigToHash(big.NewInt(int64(maxStoredBlocks+i))))
 		}
 
 		// Verify the blocks in [overlapBlocks+1, maxStoredBlocks] remain unchanged
@@ -429,16 +386,8 @@ func TestL1OriginSource(t *testing.T) {
 			binary.BigEndian.PutUint64(indexBytes[24:], bufferIndex)
 			structBaseSlot := crypto.Keccak256Hash(append(indexBytes, baseSlot[:]...))
 
-			// Check block height
-			heightSlot := addToHash(structBaseSlot, 5)
-			haveHeightBytes := statedb.GetState(params.L1OriginContractAddress, heightSlot)
-			haveHeight := new(big.Int).SetBytes(haveHeightBytes[:])
-
-			wantHeight := big.NewInt(int64(i))
-			if haveHeight.Cmp(wantHeight) != 0 {
-				t.Errorf("block %d, height mismatch for unchanged block: got %v, want %v",
-					i, haveHeight, wantHeight)
-			}
+			// Check block height to verify if it is unchanged
+			verifyStructField(t, statedb, structBaseSlot, 5, common.BigToHash(big.NewInt(int64(i))))
 		}
 	}
 
