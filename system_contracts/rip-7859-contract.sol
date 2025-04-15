@@ -72,6 +72,11 @@ contract L1OriginSourceImpl is L1OriginSource {
         bytes32 transactionRoot
     ) external onlySystem {
         require(height > 0, "L1OriginSourceImpl: height cannot be zero");
+        require(blockHash > 0, "L1OriginSourceImpl: blockHash cannot be zero");
+        require(parentBeaconRoot > 0, "L1OriginSourceImpl: parentBeaconRoot cannot be zero");
+        require(stateRoot > 0, "L1OriginSourceImpl: stateRoot cannot be zero");
+        require(receiptRoot > 0, "L1OriginSourceImpl: receiptRoot cannot be zero");
+        require(transactionRoot > 0, "L1OriginSourceImpl: transactionRoot cannot be zero");
 
         // Store in the buffer using modulo to get the buffer index
         uint256 bufferIndex = height % MAX_STORED_BLOCKS;

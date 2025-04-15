@@ -47,35 +47,6 @@ func NewStateProcessor(config *params.ChainConfig, chain *HeaderChain) *StatePro
 	}
 }
 
-// Data for the L1OriginSource system  contract (RIP-7859).
-type L1OriginSource struct {
-	blockHash        common.Hash
-	parentBeaconRoot common.Hash
-	stateRoot        common.Hash
-	receiptRoot      common.Hash
-	transactionRoot  common.Hash
-	blockHeight      *big.Int
-}
-
-// Encodes the system contract function call to update the L1OriginSource data.
-func (l *L1OriginSource) UpdateL1OriginSourceCallData() []byte {
-	// Function signature: updateL1BlockData(uint256,bytes32,bytes32,bytes32,bytes32,bytes32)
-	methodID := crypto.Keccak256([]byte("updateL1BlockData(uint256,bytes32,bytes32,bytes32,bytes32,bytes32)"))[0:4]
-
-	data := make([]byte, 4+32*6) // 4 bytes for method ID + 6 parameters of 32 bytes each
-	copy(data[0:4], methodID)
-
-	heightBytes := common.LeftPadBytes(l.blockHeight.Bytes(), 32)
-	copy(data[4:36], heightBytes)
-	copy(data[36:68], l.blockHash[:])
-	copy(data[68:100], l.parentBeaconRoot[:])
-	copy(data[100:132], l.stateRoot[:])
-	copy(data[132:164], l.receiptRoot[:])
-	copy(data[164:196], l.transactionRoot[:])
-
-	return data
-}
-
 // Process processes the state changes according to the Ethereum rules by running
 // the transaction messages using the statedb and applying any rewards to both
 // the processor (coinbase) and any included uncles.
@@ -286,40 +257,6 @@ func ProcessParentBlockHash(prevHash common.Hash, evm *vm.EVM) {
 	if err != nil {
 		panic(err)
 	}
-	if evm.StateDB.AccessEvents() != nil {
-		evm.StateDB.AccessEvents().Merge(evm.AccessEvents)
-	}
-	evm.StateDB.Finalise(true)
-}
-
-// ProcessL1OriginBlockInfo stores the L1 block info in the L1OriginSource contract
-// as defined in RIP-7859.
-func ProcessL1OriginBlockInfo(l1OriginSource *L1OriginSource, evm *vm.EVM) {
-	if tracer := evm.Config.Tracer; tracer != nil {
-		onSystemCallStart(tracer, evm.GetVMContext())
-		if tracer.OnSystemCallEnd != nil {
-			defer tracer.OnSystemCallEnd()
-		}
-	}
-
-	msg := &Message{
-		From:      params.SystemAddress,
-		GasLimit:  30_000_000,
-		GasPrice:  common.Big0,
-		GasFeeCap: common.Big0,
-		GasTipCap: common.Big0,
-		To:        &params.L1OriginContractAddress,
-		Data:      l1OriginSource.UpdateL1OriginSourceCallData(),
-	}
-
-	evm.SetTxContext(NewEVMTxContext(msg))
-	evm.StateDB.AddAddressToAccessList(params.L1OriginContractAddress)
-	_, _, err := evm.Call(msg.From, *msg.To, msg.Data, msg.GasLimit, common.U2560)
-
-	if err != nil {
-		panic(fmt.Errorf("failed to process L1 block info: %v", err))
-	}
-
 	if evm.StateDB.AccessEvents() != nil {
 		evm.StateDB.AccessEvents().Merge(evm.AccessEvents)
 	}
