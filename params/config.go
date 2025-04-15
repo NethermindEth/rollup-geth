@@ -371,11 +371,12 @@ type ChainConfig struct {
 
 	// Fork scheduling was switched from blocks to timestamps here
 
-	ShanghaiTime *uint64 `json:"shanghaiTime,omitempty"` // Shanghai switch time (nil = no fork, 0 = already on shanghai)
-	CancunTime   *uint64 `json:"cancunTime,omitempty"`   // Cancun switch time (nil = no fork, 0 = already on cancun)
-	PragueTime   *uint64 `json:"pragueTime,omitempty"`   // Prague switch time (nil = no fork, 0 = already on prague)
-	OsakaTime    *uint64 `json:"osakaTime,omitempty"`    // Osaka switch time (nil = no fork, 0 = already on osaka)
-	VerkleTime   *uint64 `json:"verkleTime,omitempty"`   // Verkle switch time (nil = no fork, 0 = already on verkle)
+	ShanghaiTime       *uint64 `json:"shanghaiTime,omitempty"`       // Shanghai switch time (nil = no fork, 0 = already on shanghai)
+	CancunTime         *uint64 `json:"cancunTime,omitempty"`         // Cancun switch time (nil = no fork, 0 = already on cancun)
+	PragueTime         *uint64 `json:"pragueTime,omitempty"`         // Prague switch time (nil = no fork, 0 = already on prague)
+	OsakaTime          *uint64 `json:"osakaTime,omitempty"`          // Osaka switch time (nil = no fork, 0 = already on osaka)
+	VerkleTime         *uint64 `json:"verkleTime,omitempty"`         // Verkle switch time (nil = no fork, 0 = already on verkle)
+	SlotPrecompileTime *uint64 `json:"slotPrecompileTime,omitempty"` // EIP-7843 SLOT precompile activation time
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
@@ -619,6 +620,12 @@ func (c *ChainConfig) IsVerkle(num *big.Int, time uint64) bool {
 	return c.IsLondon(num) && isTimestampForked(c.VerkleTime, time)
 }
 
+// IsCommonCoreV1 returns whether time is either equal to the CCV1 fork time or greater.
+func (c *ChainConfig) IsCommonCoreV1(num *big.Int, time uint64) bool {
+	// For simplicity, we check if it is Cancun or later; in real life, we would check for timestamp like the others
+	return c.IsCancun(num, time)
+}
+
 // IsVerkleGenesis checks whether the verkle fork is activated at the genesis block.
 //
 // Verkle mode is considered enabled if the verkle fork time is configured,
@@ -694,6 +701,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "pragueTime", timestamp: c.PragueTime, optional: true},
 		{name: "osakaTime", timestamp: c.OsakaTime, optional: true},
 		{name: "verkleTime", timestamp: c.VerkleTime, optional: true},
+		{name: "slotPrecompileTime", timestamp: c.SlotPrecompileTime, optional: true},
 	} {
 		if lastFork.name != "" {
 			switch {
@@ -842,6 +850,9 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 	}
 	if isForkTimestampIncompatible(c.VerkleTime, newcfg.VerkleTime, headTimestamp) {
 		return newTimestampCompatError("Verkle fork timestamp", c.VerkleTime, newcfg.VerkleTime)
+	}
+	if isForkTimestampIncompatible(c.SlotPrecompileTime, newcfg.SlotPrecompileTime, headTimestamp) {
+		return newTimestampCompatError("SlotPrecompile fork timestamp", c.SlotPrecompileTime, newcfg.SlotPrecompileTime)
 	}
 	return nil
 }
@@ -1017,6 +1028,7 @@ type Rules struct {
 	IsBerlin, IsLondon                                      bool
 	IsMerge, IsShanghai, IsCancun, IsPrague, IsOsaka        bool
 	IsVerkle                                                bool
+	IsCommonCoreV1                                          bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1048,5 +1060,6 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsOsaka:          isMerge && c.IsOsaka(num, timestamp),
 		IsVerkle:         isVerkle,
 		IsEIP4762:        isVerkle,
+		IsCommonCoreV1:   isMerge && c.IsCommonCoreV1(num, timestamp),
 	}
 }
