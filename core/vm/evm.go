@@ -65,6 +65,7 @@ type BlockContext struct {
 	BaseFee     *big.Int       // Provides information for BASEFEE (0 if vm runs with NoBaseFee flag and 0 gas price)
 	BlobBaseFee *big.Int       // Provides information for BLOBBASEFEE (0 if vm runs with NoBaseFee flag and 0 blob gas price)
 	Random      *common.Hash   // Provides information for PREVRANDAO
+	BlockHeader *types.Header  // Provides the full block header
 }
 
 // TxContext provides the EVM with information about a transaction.
@@ -141,6 +142,24 @@ func NewEVM(blockCtx BlockContext, statedb StateDB, chainConfig *params.ChainCon
 		jumpDests:   make(map[common.Hash]bitvec),
 	}
 	evm.precompiles = activePrecompiledContracts(evm.chainRules)
+
+	slotPrecompileAddr := common.BytesToAddress([]byte{0x12})
+
+	if p, ok := evm.precompiles[slotPrecompileAddr]; ok {
+		if _, isSlotPrecompile := p.(*SlotPrecompile); isSlotPrecompile {
+			if evm.Context.BlockHeader != nil && evm.Context.BlockHeader.SlotNumber != nil {
+				evm.precompiles[slotPrecompileAddr] = &SlotPrecompile{
+					SlotNumber: *evm.Context.BlockHeader.SlotNumber,
+				}
+			} else if evm.Context.BlockNumber != nil {
+				blockNumber := evm.Context.BlockNumber.Uint64()
+				evm.precompiles[slotPrecompileAddr] = &SlotPrecompile{
+					SlotNumber: blockNumber,
+				}
+			}
+		}
+	}
+
 	evm.interpreter = NewEVMInterpreter(evm)
 	return evm
 }
