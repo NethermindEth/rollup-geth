@@ -3,14 +3,14 @@ pragma solidity ^0.8.19;
 
 interface L1OriginSource {
     function getL1OriginBlockHash() external view returns (bytes32 blockHash);
-    function getL1OriginParentBeaconRoot() external view returns (bytes32 blockHash);
+    function getL1OriginParentBeaconRoot() external view returns (bytes32 beaconRoot);
     function getL1OriginStateRoot() external view returns (bytes32 stateRoot);
     function getL1OriginReceiptRoot() external view returns (bytes32 receiptRoot);
     function getL1OriginTransactionRoot() external view returns (bytes32 transactionRoot);
     function getL1OriginBlockHeight() external view returns (uint256 blockHeight);
 
     function getL1OriginBlockHashAt(uint256 height) external view returns (bytes32 blockHash);
-    function getL1OriginParentBeaconRootAt(uint256 height) external view returns (bytes32 blockHash);
+    function getL1OriginParentBeaconRootAt(uint256 height) external view returns (bytes32 beaconRoot);
     function getL1OriginStateRootAt(uint256 height) external view returns (bytes32 stateRoot);
     function getL1OriginReceiptRootAt(uint256 height) external view returns (bytes32 receiptRoot);
     function getL1OriginTransactionRootAt(uint256 height) external view returns (bytes32 transactionRoot);
@@ -116,7 +116,7 @@ contract L1OriginSourceImpl is L1OriginSource {
         return _getBlockDataAt(currentL1BlockHeight).blockHash;
     }
 
-    function getL1OriginParentBeaconRoot() external view override returns (bytes32 blockHash) {
+    function getL1OriginParentBeaconRoot() external view override returns (bytes32 beaconRoot) {
         require(currentL1BlockHeight > 0, "L1OriginSourceImpl: no L1 blocks available");
         return _getBlockDataAt(currentL1BlockHeight).parentBeaconRoot;
     }
@@ -144,7 +144,7 @@ contract L1OriginSourceImpl is L1OriginSource {
         return _getBlockDataAt(height).blockHash;
     }
 
-    function getL1OriginParentBeaconRootAt(uint256 height) external view override returns (bytes32 blockHash) {
+    function getL1OriginParentBeaconRootAt(uint256 height) external view override returns (bytes32 beaconRoot) {
         return _getBlockDataAt(height).parentBeaconRoot;
     }
 
