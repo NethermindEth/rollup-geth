@@ -95,6 +95,9 @@ type StateDB interface {
 	AddLog(*types.Log)
 	AddPreimage(common.Hash, []byte)
 
+	// TxIndex returns the current transaction index set by SetTxContext
+	TxIndex() int
+
 	Witness() *stateless.Witness
 
 	AccessEvents() *state.AccessEvents

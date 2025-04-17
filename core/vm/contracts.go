@@ -141,13 +141,19 @@ var PrecompiledContractsBLS = PrecompiledContractsPrague
 
 var PrecompiledContractsVerkle = PrecompiledContractsPrague
 
+var PrecompiledContractsCommonCoreV1 = PrecompiledContracts{
+	common.BytesToAddress([]byte{0x0b}): &txIndex{},
+}
+
 var (
-	PrecompiledAddressesPrague    []common.Address
-	PrecompiledAddressesCancun    []common.Address
-	PrecompiledAddressesBerlin    []common.Address
-	PrecompiledAddressesIstanbul  []common.Address
-	PrecompiledAddressesByzantium []common.Address
-	PrecompiledAddressesHomestead []common.Address
+	PrecompiledAddressesVerkle       []common.Address
+	PrecompiledAddressesPrague       []common.Address
+	PrecompiledAddressesCancun       []common.Address
+	PrecompiledAddressesBerlin       []common.Address
+	PrecompiledAddressesIstanbul     []common.Address
+	PrecompiledAddressesByzantium    []common.Address
+	PrecompiledAddressesHomestead    []common.Address
+	PrecompiledAddressesCommonCoreV1 []common.Address
 )
 
 func init() {
@@ -169,10 +175,15 @@ func init() {
 	for k := range PrecompiledContractsPrague {
 		PrecompiledAddressesPrague = append(PrecompiledAddressesPrague, k)
 	}
+	for k := range PrecompiledContractsCommonCoreV1 {
+		PrecompiledAddressesCommonCoreV1 = append(PrecompiledAddressesCommonCoreV1, k)
+	}
 }
 
 func activePrecompiledContracts(rules params.Rules) PrecompiledContracts {
 	switch {
+	case rules.IsCommonCoreV1:
+		return PrecompiledContractsCommonCoreV1
 	case rules.IsVerkle:
 		return PrecompiledContractsVerkle
 	case rules.IsPrague:
@@ -1181,4 +1192,28 @@ func kZGToVersionedHash(kzg kzg4844.Commitment) common.Hash {
 	h[0] = blobCommitmentVersionKZG
 
 	return h
+}
+
+// txIndex implements EIP-7793 TXINDEX precompile.
+type txIndex struct {
+	getTxIndex func() int
+}
+
+// RequiredGas returns the gas required to execute the TXINDEX precompile.
+func (c *txIndex) RequiredGas(input []byte) uint64 {
+	return params.TxIndexGas
+}
+
+// Run returns the transaction index within the current block.
+func (c *txIndex) Run(input []byte) ([]byte, error) {
+	// Encode the transaction index as a 4-byte big-endian integer
+	output := make([]byte, 4)
+	binary.BigEndian.PutUint32(output, uint32(c.getTxIndex()))
+
+	return output, nil
+}
+
+// SetIndexFn sets the function to retrieve the current transaction index
+func (c *txIndex) SetTxIndexFn(fn func() int) {
+	c.getTxIndex = fn
 }

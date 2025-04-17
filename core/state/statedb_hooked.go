@@ -161,6 +161,10 @@ func (s *hookedStateDB) AccessEvents() *AccessEvents {
 	return s.inner.AccessEvents()
 }
 
+func (s *hookedStateDB) TxIndex() int {
+	return s.inner.TxIndex()
+}
+
 func (s *hookedStateDB) SubBalance(addr common.Address, amount *uint256.Int, reason tracing.BalanceChangeReason) uint256.Int {
 	prev := s.inner.SubBalance(addr, amount, reason)
 	if s.hooks.OnBalanceChange != nil && !amount.IsZero() {
