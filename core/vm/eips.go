@@ -40,6 +40,7 @@ var activators = map[int]func(*JumpTable){
 	1344: enable1344,
 	1153: enable1153,
 	4762: enable4762,
+	2937: enable2937,
 	7702: enable7702,
 }
 
@@ -530,6 +531,16 @@ func enable4762(jt *JumpTable) {
 			minStack:    minStack(0, 1),
 			maxStack:    maxStack(0, 1),
 		}
+	}
+}
+
+// Enable EIP-2937
+func enable2937(jt *JumpTable) {
+	jt[SET_INDESTRUCTIBLE] = &operation{
+		execute:     opSetIndestructible,
+		constantGas: GasQuickStep,
+		minStack:    minStack(0, 0),
+		maxStack:    maxStack(0, 0),
 	}
 }
 

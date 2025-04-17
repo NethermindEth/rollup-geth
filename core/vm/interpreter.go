@@ -106,6 +106,8 @@ func NewEVMInterpreter(evm *EVM) *EVMInterpreter {
 	// If jump table was not initialised we set the default one.
 	var table *JumpTable
 	switch {
+	case evm.chainRules.IsCommonCoreV1:
+		table = &commonCoreV1InstructionSet
 	case evm.chainRules.IsVerkle:
 		// TODO replace with proper instruction set when fork is specified
 		table = &verkleInstructionSet

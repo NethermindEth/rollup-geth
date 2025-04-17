@@ -19,6 +19,7 @@ package vm
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -28,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -899,6 +901,75 @@ func TestOpMCopy(t *testing.T) {
 			t.Errorf("case %d: gas wrong, want %d have %d\n", i, wantGas, haveGas)
 		}
 	}
+}
+
+// Define a custom tracer to check if the SET_INDESTRUCTIBLE opcode was called
+type setIndestructibleTracer struct {
+	seenSetIndestructible bool
+	seenSelfdestruct      bool
+}
+
+func (t *setIndestructibleTracer) OnOpcode(pc uint64, op byte, gas, cost uint64, scope tracing.OpContext, rData []byte, depth int, err error) {
+	if op == byte(SET_INDESTRUCTIBLE) {
+		t.seenSetIndestructible = true
+	}
+	if op == byte(SELFDESTRUCT) {
+		t.seenSelfdestruct = true
+	}
+}
+
+func TestOpSetIndestructible(t *testing.T) {
+	t.Run("SET_INDESTRUCTIBLE at position 0", func(t *testing.T) {
+		bytecode := []byte{
+			byte(SET_INDESTRUCTIBLE),
+			byte(PUSH1), 0x0,
+			byte(SELFDESTRUCT),
+		}
+
+		addr := common.HexToAddress("0x1")
+
+		contract := NewContract(addr, addr, uint256.NewInt(0), 100000, nil)
+		contract.Code = bytecode
+
+		tracer := &setIndestructibleTracer{}
+
+		statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
+		statedb.CreateAccount(addr)
+		statedb.CreateContract(addr)
+		statedb.SetCode(addr, bytecode)
+
+		env := NewEVM(BlockContext{BlockNumber: big.NewInt(1), Random: &common.Hash{}, Time: 1}, statedb, params.MergedTestChainConfig, Config{
+			Tracer: &tracing.Hooks{
+				OnOpcode: tracer.OnOpcode,
+			},
+		})
+
+		// Run the contract
+		_, err := env.interpreter.Run(contract, nil, false)
+
+		// Verify that SET_INDESTRUCTIBLE was executed
+		if !tracer.seenSetIndestructible {
+			t.Error("SET_INDESTRUCTIBLE opcode was not executed")
+		}
+
+		// Verify that SELFDESTRUCT was executed
+		if !tracer.seenSelfdestruct {
+			t.Error("SELFDESTRUCT opcode was not executed")
+		}
+
+		// Verify that the contract is marked as indestructible
+		if _, exists := env.indestructibleContracts[addr]; !exists {
+			t.Error("contract not marked as indestructible")
+		}
+
+		// Verify that the execution failed with ErrIndestructibleContract
+		if err == nil {
+			t.Error("expected execution to fail with ErrIndestructibleContract, but it succeeded")
+		} else if !errors.Is(err, ErrIndestructibleContract) {
+			t.Errorf("expected ErrIndestructibleContract, got %v", err)
+		}
+
+	})
 }
 
 // TestPush sanity-checks how code with immediates are handled when the code size is
