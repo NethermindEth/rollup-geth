@@ -199,7 +199,6 @@ func (st *stateTransition) preCheck() error {
 				msg.From.Hex(), stNonce)
 		}
 	}
-
 	if !msg.SkipFromEOACheck {
 		// Make sure the sender is an EOA
 		code := st.state.GetCode(msg.From)
@@ -208,12 +207,10 @@ func (st *stateTransition) preCheck() error {
 			return fmt.Errorf("%w: address %v, len(code): %d", ErrSenderNoEOA, msg.From.Hex(), len(code))
 		}
 	}
-
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
 	if err := st.preCheckGasLondon(msg); err != nil {
 		return err
 	}
-
 	// Check the blob version validity
 	if msg.BlobHashes != nil {
 		// The to field of a blob tx type is mandatory, and a `BlobTx` transaction internally
@@ -231,12 +228,10 @@ func (st *stateTransition) preCheck() error {
 			}
 		}
 	}
-
 	// Check that the user is paying at least the current blob fee
 	if err := st.preCheckGasCancun(msg); err != nil {
 		return err
 	}
-
 	// Check that EIP-7702 authorization list signatures are well formed.
 	if msg.SetCodeAuthorizations != nil {
 		if msg.To == nil {
@@ -246,7 +241,6 @@ func (st *stateTransition) preCheck() error {
 			return fmt.Errorf("%w (sender %v)", ErrEmptyAuthList, msg.From)
 		}
 	}
-
 	return st.buyGas()
 }
 
@@ -291,7 +285,6 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 	if st.gasRemaining < gas {
 		return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gasRemaining, gas)
 	}
-
 	// Gas limit suffices for the floor data cost (EIP-7623)
 	if rules.IsPrague {
 		floorDataGas, err = FloorDataGas(msg.Data)
@@ -302,7 +295,6 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 			return nil, fmt.Errorf("%w: have %d, want %d", ErrFloorDataGas, msg.GasLimit, floorDataGas)
 		}
 	}
-
 	if t := st.evm.Config.Tracer; t != nil && t.OnGasChange != nil {
 		t.OnGasChange(st.gasRemaining, st.gasRemaining-gas, tracing.GasChangeTxIntrinsicGas)
 	}
