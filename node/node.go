@@ -130,7 +130,7 @@ func New(conf *Config) (*Node, error) {
 	node.keyDirTemp = isEphem
 	// Creates an empty AccountManager with no backends. Callers (e.g. cmd/geth)
 	// are required to add the backends later on.
-	node.accman = accounts.NewManager(&accounts.Config{InsecureUnlockAllowed: conf.InsecureUnlockAllowed})
+	node.accman = accounts.NewManager(nil)
 
 	// Initialize the p2p server. This creates the node key and discovery databases.
 	node.server.Config.PrivateKey = node.config.NodeKey()
@@ -375,25 +375,13 @@ func (n *Node) obtainJWTSecret(cliParam string) ([]byte, error) {
 // startup. It's not meant to be called at any time afterwards as it makes certain
 // assumptions about the state of the node.
 func (n *Node) startRPC() error {
-	// Filter out personal api
-	var apis []rpc.API
-	for _, api := range n.rpcAPIs {
-		if api.Namespace == "personal" {
-			if n.config.EnablePersonal {
-				log.Warn("Deprecated personal namespace activated")
-			} else {
-				continue
-			}
-		}
-		apis = append(apis, api)
-	}
-	if err := n.startInProc(apis); err != nil {
+	if err := n.startInProc(n.rpcAPIs); err != nil {
 		return err
 	}
 
 	// Configure IPC.
 	if n.ipc.endpoint != "" {
-		if err := n.ipc.start(apis); err != nil {
+		if err := n.ipc.start(n.rpcAPIs); err != nil {
 			return err
 		}
 	}
@@ -442,6 +430,14 @@ func (n *Node) startRPC() error {
 	}
 
 	initAuth := func(port int, secret []byte) error {
+		authModules := DefaultAuthModules
+		if slices.Contains(n.config.HTTPModules, "miner") {
+			authModules = append(authModules, "miner")
+		}
+		if slices.Contains(n.config.HTTPModules, "debug") {
+			authModules = append(authModules, "debug")
+		}
+
 		// Enable auth via HTTP
 		server := n.httpAuth
 		if err := server.setListenAddr(n.config.AuthAddr, port); err != nil {
@@ -456,7 +452,7 @@ func (n *Node) startRPC() error {
 		err := server.enableRPC(allAPIs, httpConfig{
 			CorsAllowedOrigins: DefaultAuthCors,
 			Vhosts:             n.config.AuthVirtualHosts,
-			Modules:            DefaultAuthModules,
+			Modules:            authModules,
 			prefix:             DefaultAuthPrefix,
 			rpcEndpointConfig:  sharedConfig,
 		})
@@ -723,7 +719,7 @@ func (n *Node) OpenDatabase(name string, cache, handles int, namespace string, r
 	if n.config.DataDir == "" {
 		db = rawdb.NewMemoryDatabase()
 	} else {
-		db, err = rawdb.Open(rawdb.OpenOptions{
+		db, err = openDatabase(openOptions{
 			Type:      n.config.DBEngine,
 			Directory: n.ResolvePath(name),
 			Namespace: namespace,
@@ -732,7 +728,6 @@ func (n *Node) OpenDatabase(name string, cache, handles int, namespace string, r
 			ReadOnly:  readonly,
 		})
 	}
-
 	if err == nil {
 		db = n.wrapDatabase(db)
 	}
@@ -755,7 +750,7 @@ func (n *Node) OpenDatabaseWithFreezer(name string, cache, handles int, ancient 
 	if n.config.DataDir == "" {
 		db, err = rawdb.NewDatabaseWithFreezer(memorydb.New(), "", namespace, readonly)
 	} else {
-		db, err = rawdb.Open(rawdb.OpenOptions{
+		db, err = openDatabase(openOptions{
 			Type:              n.config.DBEngine,
 			Directory:         n.ResolvePath(name),
 			AncientsDirectory: n.ResolveAncient(name, ancient),
@@ -765,7 +760,6 @@ func (n *Node) OpenDatabaseWithFreezer(name string, cache, handles int, ancient 
 			ReadOnly:          readonly,
 		})
 	}
-
 	if err == nil {
 		db = n.wrapDatabase(db)
 	}

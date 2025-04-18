@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
+	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
@@ -121,6 +122,10 @@ func (f *fetchResult) Done(kind uint) bool {
 	return v&(1<<kind) == 0
 }
 
+type OPStackChainConfig interface {
+	IsOptimismIsthmus(time uint64) bool
+}
+
 // queue represents hashes that are either need fetching or are being fetched
 type queue struct {
 	mode SyncMode // Synchronisation mode to decide on the block parts to schedule for fetching
@@ -156,10 +161,15 @@ type queue struct {
 	closed bool
 
 	logTime time.Time // Time instance when status was last reported
+
+	// opConfig is used for OP-Stack chain configuration checks.
+	// This may be nil if not an OP-Stack chain.
+	opConfig OPStackChainConfig
 }
 
 // newQueue creates a new download queue for scheduling block retrieval.
-func newQueue(blockCacheLimit int, thresholdInitialSize int) *queue {
+// The opConfig argument may be nil, if not an OP-Stack chain.
+func newQueue(opConfig OPStackChainConfig, blockCacheLimit int, thresholdInitialSize int) *queue {
 	lock := new(sync.RWMutex)
 	q := &queue{
 		headerContCh:     make(chan bool, 1),
@@ -169,6 +179,7 @@ func newQueue(blockCacheLimit int, thresholdInitialSize int) *queue {
 		receiptWakeCh:    make(chan bool, 1),
 		active:           sync.NewCond(lock),
 		lock:             lock,
+		opConfig:         opConfig,
 	}
 	q.Reset(blockCacheLimit, thresholdInitialSize)
 	return q
@@ -180,7 +191,7 @@ func (q *queue) Reset(blockCacheLimit int, thresholdInitialSize int) {
 	defer q.lock.Unlock()
 
 	q.closed = false
-	q.mode = FullSync
+	q.mode = ethconfig.FullSync
 
 	q.headerHead = common.Hash{}
 	q.headerPendPool = make(map[string]*fetchRequest)
@@ -328,7 +339,7 @@ func (q *queue) Schedule(headers []*types.Header, hashes []common.Hash, from uin
 			q.blockTaskQueue.Push(header, -int64(header.Number.Uint64()))
 		}
 		// Queue for receipt retrieval
-		if q.mode == SnapSync && !header.EmptyReceipts() {
+		if q.mode == ethconfig.SnapSync && !header.EmptyReceipts() {
 			if _, ok := q.receiptTaskPool[hash]; ok {
 				log.Warn("Header already scheduled for receipt fetch", "number", header.Number, "hash", hash)
 			} else {
@@ -523,7 +534,7 @@ func (q *queue) reserveHeaders(p *peerConnection, count int, taskPool map[common
 		// we can ask the resultcache if this header is within the
 		// "prioritized" segment of blocks. If it is not, we need to throttle
 
-		stale, throttle, item, err := q.resultCache.AddFetch(header, q.mode == SnapSync)
+		stale, throttle, item, err := q.resultCache.AddFetch(header, q.mode == ethconfig.SnapSync)
 		if stale {
 			// Don't put back in the task queue, this item has already been
 			// delivered upstream
@@ -785,7 +796,7 @@ func (q *queue) DeliverHeaders(id string, headers []*types.Header, hashes []comm
 func (q *queue) DeliverBodies(id string, txLists [][]*types.Transaction, txListHashes []common.Hash,
 	uncleLists [][]*types.Header, uncleListHashes []common.Hash,
 	withdrawalLists [][]*types.Withdrawal, withdrawalListHashes []common.Hash,
-	requestsLists [][]*types.Request, requestsListHashes []common.Hash) (int, error) {
+) (int, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
@@ -805,20 +816,13 @@ func (q *queue) DeliverBodies(id string, txLists [][]*types.Transaction, txListH
 			if withdrawalLists[index] == nil {
 				return errInvalidBody
 			}
-			if withdrawalListHashes[index] != *header.WithdrawalsHash {
-				return errInvalidBody
-			}
-		}
-		if header.RequestsHash == nil {
-			// nil hash means that requests should not be present in body
-			if requestsLists[index] != nil {
-				return errInvalidBody
-			}
-		} else { // non-nil hash: body must have requests
-			if requestsLists[index] == nil {
-				return errInvalidBody
-			}
-			if requestsListHashes[index] != *header.RequestsHash {
+			if q.opConfig != nil && q.opConfig.IsOptimismIsthmus(header.Time) {
+				// If Isthmus, we expect an empty list of withdrawal operations,
+				// but the WithdrawalsHash in the header is used for the withdrawals state storage-root.
+				if withdrawalListHashes[index] != types.EmptyWithdrawalsHash {
+					return errInvalidBody
+				}
+			} else if withdrawalListHashes[index] != *header.WithdrawalsHash {
 				return errInvalidBody
 			}
 		}
@@ -894,7 +898,7 @@ func (q *queue) DeliverReceipts(id string, receiptList [][]*types.Receipt, recei
 // to access the queue, so they already need a lock anyway.
 func (q *queue) deliver(id string, taskPool map[common.Hash]*types.Header,
 	taskQueue *prque.Prque[int64, *types.Header], pendPool map[string]*fetchRequest,
-	reqTimer metrics.Timer, resInMeter metrics.Meter, resDropMeter metrics.Meter,
+	reqTimer *metrics.Timer, resInMeter, resDropMeter *metrics.Meter,
 	results int, validate func(index int, header *types.Header) error,
 	reconstruct func(index int, result *fetchResult)) (int, error) {
 	// Short circuit if the data was never requested

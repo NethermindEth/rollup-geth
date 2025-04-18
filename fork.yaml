@@ -5,7 +5,7 @@ footer: |
 base:
   name: go-ethereum
   url: https://github.com/ethereum/go-ethereum
-  hash: f3c696fa1db75d0f78ea47dd0975f6f0de6fdd84 # v1.14.11
+  hash: 612c9e0f4ae483f180ef96ace86effec6dc9bb0e # v1.15.3
 fork:
   name: op-geth
   url: https://github.com/ethereum-optimism/op-geth
@@ -122,12 +122,19 @@ def:
             This also includes experimental support for interop executing-messages to be verified through an RPC.
           globs:
             - "miner/*"
-        - title: "Tx-pool tx cost updates"
-          description: |
-            Transaction queueing and inclusion needs to account for the L1 cost component.
-          globs:
-            - "core/txpool/**/*"
-            - "core/txpool/legacypool/*"
+        - title: "Tx-pool"
+          sub:
+            - title: "Full Tx-pool journaling"
+              description: |
+                Adds support for full tx-pool journaling via the journalremotes config flag.
+              globs:
+                - "core/txpool/locals/pool_journaler.go"
+            - title: "Transaction cost updates"
+              description: |
+                Transaction queueing and inclusion needs to account for the L1 cost component.
+              globs:
+                - "core/txpool/**/*"
+                - "core/txpool/legacypool/*"
         - title: "RIP-7212"
           description: ""
           globs:
@@ -205,6 +212,12 @@ def:
           globs:
             - "eth/downloader/downloader.go"
             - "eth/downloader/receiptreference.go"
+        - title: PathDB diff-layers limit
+          description: |
+            Prevent the write-buffer to grow too large, to keep the journal optional,
+            and not restart on top of unavailable state.
+          globs:
+            - "triedb/pathdb/buffer.go"
         - title: Discv5 node discovery
           description: Fix discv5 option to allow discv5 to be an active source for node-discovery.
           globs:
@@ -216,14 +229,6 @@ def:
         - title: Generated TOML config update
           globs:
             - "eth/ethconfig/gen_config.go"
-    - title: "TrieDB PathDB-journal migration"
-      description: |
-        From version 1.13.15 to 1.14.0 upstream go-ethereum changed the PathDB journal version, without migration path.
-        For a better experience when updating op-geth, to not roll back any journaled stage changes,
-        op-geth implements backward-compatibility with the old journal version.
-        See upstream Geth PR 28940, and op-geth PR 368 for details.
-      globs:
-        - "triedb/pathdb/journal.go"
     - title: "Single threaded execution"
       description: |
         The cannon fault proofs virtual machine does not support the creation of threads. To ensure compatibility, 
@@ -265,6 +270,10 @@ def:
           globs:
             - "internal/ethapi/api.go"
             - "rpc/errors.go"
+        - title: eth_simulateV1 API fix
+          description: Add deposit-nonce tx metadata to results of `eth_simulateV1` API to match rpc block format.
+          globs:
+            - "internal/ethapi/simulate.go"
         - title: Tracer RPC daisy-chain
           description: Forward pre-bedrock tracing calls to legacy node.
           globs:
@@ -318,10 +327,25 @@ def:
     - title: "Geth extras"
       description: Extend the tools available in geth to improve external testing and tooling.
       sub:
+        - title: JSON-RPC recording
+          description: |
+            Extend server and client with configurable JSON-RPC message recording.
+            This enables loggers and advanced metrics to be attached to server and client sides.
+          globs:
+            - "rpc/client.go"
+            - "rpc/client_opt.go"
+            - "rpc/handler.go"
+            - "rpc/inproc.go"
+            - "rpc/recording.go"
+            - "rpc/server.go"
+            - "rpc/subscription.go"
         - title: Simulated Backend
           globs:
             - "accounts/abi/bind/backends/simulated.go"
             - "ethclient/simulated/backend.go"
+        - title: Fix ABI bindings gas-estimation to use access-list
+          globs:
+            - "accounts/abi/bind/base.go"
         - title: Live tracer update
           description: |
             Track L1-deposited native currency that is coming into the L2 supply.
@@ -329,13 +353,14 @@ def:
             similar to a withdrawal of the Beacon-chain into the Ethereum L1 execution chain.
           globs:
             - "eth/tracers/live/supply.go"
-    - title: "Hardware wallet support"
-      description: Extend Ledger wallet support for newer devices on Macos
-      sub:
-        - title: Fix Ledger discoverability
-          # upstream PR: https://github.com/ethereum/go-ethereum/pull/28863/
+        - title: EVM t8ntool
+          description: |
+            The EVM `t8ntool` has not been updated with most op-stack features and does not
+            use the same sealer logic as used in Geth consensus. Isthumus hard fork adds
+            a `withdrawalsRoot` field in the block header. We note that the `t8ntool` is
+            not updated to handle the newly added `withdrawalsRoot` field in the block header.
           globs:
-            - "accounts/usbwallet/hub.go"
+            - "cmd/evm/internal/t8ntool/block.go"
     - title: "Testing"
       description: Additional or modified tests, not already captured by the above diff
       ignore:

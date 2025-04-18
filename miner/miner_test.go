@@ -73,14 +73,15 @@ func (bc *testBlockChain) Config() *params.ChainConfig {
 
 func (bc *testBlockChain) CurrentBlock() *types.Header {
 	return &types.Header{
-		Number:   new(big.Int),
-		GasLimit: bc.gasLimit,
-		BaseFee:  big.NewInt(params.InitialBaseFee),
+		Number:     new(big.Int),
+		GasLimit:   bc.gasLimit,
+		BaseFee:    big.NewInt(params.InitialBaseFee),
+		Difficulty: common.Big0,
 	}
 }
 
 func (bc *testBlockChain) GetBlock(hash common.Hash, number uint64) *types.Block {
-	return types.NewBlock(bc.CurrentBlock(), nil, nil, trie.NewStackTrie(nil))
+	return types.NewBlock(bc.CurrentBlock(), nil, nil, trie.NewStackTrie(nil), types.DefaultBlockConfig)
 }
 
 func (bc *testBlockChain) StateAt(common.Hash) (*state.StateDB, error) {
@@ -148,11 +149,10 @@ func createMiner(t *testing.T) *Miner {
 	chainDB := rawdb.NewMemoryDatabase()
 	triedb := triedb.NewDatabase(chainDB, nil)
 	genesis := minerTestGenesisBlock(15, 11_500_000, testBankAddress)
-	chainConfig, _, err := core.SetupGenesisBlock(chainDB, triedb, genesis)
+	chainConfig, _, _, err := core.SetupGenesisBlock(chainDB, triedb, genesis)
 	if err != nil {
 		t.Fatalf("can't create new chain config: %v", err)
 	}
-
 	// Create consensus engine
 	engine := clique.New(chainConfig.Clique, chainDB)
 	// Create Ethereum backend
@@ -188,8 +188,8 @@ func TestRejectedConditionalTx(t *testing.T) {
 	})
 	tx.SetConditional(&types.TransactionConditional{TimestampMax: uint64Ptr(timestamp - 1)})
 
-	// 1 pending tx
-	miner.txpool.Add(types.Transactions{tx}, true, false)
+	// 1 pending tx (synchronously, it has to be there before it can be rejected)
+	miner.txpool.Add(types.Transactions{tx}, true)
 	if !miner.txpool.Has(tx.Hash()) {
 		t.Fatalf("conditional tx is not in the mempool")
 	}

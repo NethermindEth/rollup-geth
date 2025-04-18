@@ -18,6 +18,7 @@
 package types
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -104,7 +105,7 @@ type Header struct {
 	ParentBeaconRoot *common.Hash `json:"parentBeaconBlockRoot" rlp:"optional"`
 
 	// RequestsHash was added by EIP-7685 and is ignored in legacy headers.
-	RequestsHash *common.Hash `json:"requestsRoot" rlp:"optional"`
+	RequestsHash *common.Hash `json:"requestsHash" rlp:"optional"`
 }
 
 // field type overrides for gencodec
@@ -168,9 +169,8 @@ func (h *Header) SanityCheck() error {
 func (h *Header) EmptyBody() bool {
 	var (
 		emptyWithdrawals = h.WithdrawalsHash == nil || *h.WithdrawalsHash == EmptyWithdrawalsHash
-		emptyRequests    = h.RequestsHash == nil || *h.RequestsHash == EmptyReceiptsHash
 	)
-	return h.TxHash == EmptyTxsHash && h.UncleHash == EmptyUncleHash && emptyWithdrawals && emptyRequests
+	return h.TxHash == EmptyTxsHash && h.UncleHash == EmptyUncleHash && emptyWithdrawals
 }
 
 // EmptyReceipts returns true if there are no receipts for this header/block.
@@ -201,7 +201,6 @@ type Body struct {
 	Transactions []*Transaction
 	Uncles       []*Header
 	Withdrawals  []*Withdrawal `rlp:"optional"`
-	Requests     []*Request    `rlp:"optional"`
 }
 
 // Block represents an Ethereum block.
@@ -226,7 +225,6 @@ type Block struct {
 	uncles       []*Header
 	transactions Transactions
 	withdrawals  Withdrawals
-	requests     Requests
 
 	// witness is not an encoded part of the block body.
 	// It is held in Block in order for easy relaying to the places
@@ -249,7 +247,11 @@ type extblock struct {
 	Txs         []*Transaction
 	Uncles      []*Header
 	Withdrawals []*Withdrawal `rlp:"optional"`
-	Requests    []*Request    `rlp:"optional"`
+}
+
+type BlockType interface {
+	HasOptimismWithdrawalsRoot(blkTime uint64) bool
+	IsIsthmus(blkTime uint64) bool
 }
 
 // NewBlock creates a new block. The input data is copied, changes to header and to the
@@ -257,7 +259,10 @@ type extblock struct {
 //
 // The body elements and the receipts are used to recompute and overwrite the
 // relevant portions of the header.
-func NewBlock(header *Header, body *Body, receipts []*Receipt, hasher TrieHasher) *Block {
+//
+// The receipt's bloom must already calculated for the block's bloom to be
+// correctly calculated.
+func NewBlock(header *Header, body *Body, receipts []*Receipt, hasher TrieHasher, bType BlockType) *Block {
 	if body == nil {
 		body = &Body{}
 	}
@@ -266,7 +271,6 @@ func NewBlock(header *Header, body *Body, receipts []*Receipt, hasher TrieHasher
 		txs         = body.Transactions
 		uncles      = body.Uncles
 		withdrawals = body.Withdrawals
-		requests    = body.Requests
 	)
 
 	if len(txs) == 0 {
@@ -281,7 +285,10 @@ func NewBlock(header *Header, body *Body, receipts []*Receipt, hasher TrieHasher
 		b.header.ReceiptHash = EmptyReceiptsHash
 	} else {
 		b.header.ReceiptHash = DeriveSha(Receipts(receipts), hasher)
-		b.header.Bloom = CreateBloom(receipts)
+		// Receipts must go through MakeReceipt to calculate the receipt's bloom
+		// already. Merge the receipt's bloom together instead of recalculating
+		// everything.
+		b.header.Bloom = MergeBloom(receipts)
 	}
 
 	if len(uncles) == 0 {
@@ -294,7 +301,14 @@ func NewBlock(header *Header, body *Body, receipts []*Receipt, hasher TrieHasher
 		}
 	}
 
-	if withdrawals == nil {
+	if bType.HasOptimismWithdrawalsRoot(b.header.Time) {
+		if withdrawals == nil || len(withdrawals) > 0 {
+			panic(fmt.Sprintf("expected non-nil empty withdrawals operation list in Isthmus, but got: %v", body.Withdrawals))
+		}
+		b.header.WithdrawalsHash = header.WithdrawalsHash
+		b.withdrawals = make(Withdrawals, 0)
+	} else if withdrawals == nil {
+		// pre-Canyon
 		b.header.WithdrawalsHash = nil
 	} else if len(withdrawals) == 0 {
 		b.header.WithdrawalsHash = &EmptyWithdrawalsHash
@@ -303,17 +317,6 @@ func NewBlock(header *Header, body *Body, receipts []*Receipt, hasher TrieHasher
 		hash := DeriveSha(Withdrawals(withdrawals), hasher)
 		b.header.WithdrawalsHash = &hash
 		b.withdrawals = slices.Clone(withdrawals)
-	}
-
-	if requests == nil {
-		b.header.RequestsHash = nil
-	} else if len(requests) == 0 {
-		b.header.RequestsHash = &EmptyRequestsHash
-		b.requests = Requests{}
-	} else {
-		h := DeriveSha(Requests(requests), hasher)
-		b.header.RequestsHash = &h
-		b.requests = slices.Clone(requests)
 	}
 
 	return b
@@ -365,7 +368,7 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 	if err := s.Decode(&eb); err != nil {
 		return err
 	}
-	b.header, b.uncles, b.transactions, b.withdrawals, b.requests = eb.Header, eb.Uncles, eb.Txs, eb.Withdrawals, eb.Requests
+	b.header, b.uncles, b.transactions, b.withdrawals = eb.Header, eb.Uncles, eb.Txs, eb.Withdrawals
 	b.size.Store(rlp.ListSize(size))
 	return nil
 }
@@ -377,14 +380,13 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 		Txs:         b.transactions,
 		Uncles:      b.uncles,
 		Withdrawals: b.withdrawals,
-		Requests:    b.requests,
 	})
 }
 
 // Body returns the non-header content of the block.
 // Note the returned data is not an independent copy.
 func (b *Block) Body() *Body {
-	return &Body{b.transactions, b.uncles, b.withdrawals, b.requests}
+	return &Body{b.transactions, b.uncles, b.withdrawals}
 }
 
 // Accessors for body data. These do not return a copy because the content
@@ -393,7 +395,6 @@ func (b *Block) Body() *Body {
 func (b *Block) Uncles() []*Header          { return b.uncles }
 func (b *Block) Transactions() Transactions { return b.transactions }
 func (b *Block) Withdrawals() Withdrawals   { return b.withdrawals }
-func (b *Block) Requests() Requests         { return b.requests }
 
 func (b *Block) Transaction(hash common.Hash) *Transaction {
 	for _, transaction := range b.transactions {
@@ -429,6 +430,14 @@ func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
 func (b *Block) UncleHash() common.Hash   { return b.header.UncleHash }
 func (b *Block) Extra() []byte            { return common.CopyBytes(b.header.Extra) }
 
+func (b *Block) WithdrawalsRoot() *common.Hash {
+	if b.header.WithdrawalsHash == nil {
+		return nil
+	}
+	h := *b.header.WithdrawalsHash
+	return &h
+}
+
 func (b *Block) BaseFee() *big.Int {
 	if b.header.BaseFee == nil {
 		return nil
@@ -436,7 +445,8 @@ func (b *Block) BaseFee() *big.Int {
 	return new(big.Int).Set(b.header.BaseFee)
 }
 
-func (b *Block) BeaconRoot() *common.Hash { return b.header.ParentBeaconRoot }
+func (b *Block) BeaconRoot() *common.Hash   { return b.header.ParentBeaconRoot }
+func (b *Block) RequestsHash() *common.Hash { return b.header.RequestsHash }
 
 func (b *Block) ExcessBlobGas() *uint64 {
 	var excessBlobGas *uint64
@@ -491,6 +501,21 @@ func CalcUncleHash(uncles []*Header) common.Hash {
 	return rlpHash(uncles)
 }
 
+// CalcRequestsHash creates the block requestsHash value for a list of requests.
+func CalcRequestsHash(requests [][]byte) common.Hash {
+	h1, h2 := sha256.New(), sha256.New()
+	var buf common.Hash
+	for _, item := range requests {
+		if len(item) > 1 { // skip items with only requestType and no data.
+			h1.Reset()
+			h1.Write(item)
+			h2.Write(h1.Sum(buf[:0]))
+		}
+	}
+	h2.Sum(buf[:0])
+	return buf
+}
+
 // NewBlockWithHeader creates a block with the given header data. The
 // header data is copied, changes to header and to the field values
 // will not affect the block.
@@ -518,7 +543,6 @@ func (b *Block) WithBody(body Body) *Block {
 		transactions: slices.Clone(body.Transactions),
 		uncles:       make([]*Header, len(body.Uncles)),
 		withdrawals:  slices.Clone(body.Withdrawals),
-		requests:     slices.Clone(body.Requests),
 		witness:      b.witness,
 	}
 	for i := range body.Uncles {
@@ -533,7 +557,6 @@ func (b *Block) WithWitness(witness *ExecutionWitness) *Block {
 		transactions: b.transactions,
 		uncles:       b.uncles,
 		withdrawals:  b.withdrawals,
-		requests:     b.requests,
 		witness:      witness,
 	}
 }
