@@ -25,9 +25,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -126,7 +126,7 @@ func (b *testBackend) teardown() {
 
 // newTestBackend creates a test backend. OBS: don't forget to invoke tearDown
 // after use, otherwise the blockchain instance will mem-leak via goroutines.
-func newTestBackend(t *testing.T, londonBlock *big.Int, cancunBlock *big.Int, pending bool) *testBackend {
+func newTestBackend(t *testing.T, londonBlock *big.Int, cancunBlock *big.Int, pending bool, opStack bool) *testBackend {
 	if londonBlock != nil && cancunBlock != nil && londonBlock.Cmp(cancunBlock) == 1 {
 		panic("cannot define test backend with cancun before london")
 	}
@@ -145,16 +145,42 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, cancunBlock *big.Int, pe
 		emptyBlobCommit, _ = kzg4844.BlobToCommitment(&emptyBlob)
 		emptyBlobVHash     = kzg4844.CalcBlobHashV1(sha256.New(), &emptyBlobCommit)
 	)
+	if opStack {
+		config.BlobScheduleConfig = nil
+		denom := uint64(250)
+		config.Optimism = &params.OptimismConfig{
+			EIP1559Elasticity:        6,
+			EIP1559Denominator:       50,
+			EIP1559DenominatorCanyon: &denom,
+		}
+		londonBlock = big.NewInt(0)
+		config.BedrockBlock = londonBlock
+		config.RegolithTime = new(uint64)
+		config.CanyonTime = new(uint64)
+		if cancunBlock != nil {
+			ts := gspec.Timestamp + cancunBlock.Uint64()*10 // fixed 10 sec block time in blockgen
+			config.EcotoneTime = &ts
+			config.FjordTime = &ts
+			config.GraniteTime = &ts
+			config.HoloceneTime = &ts
+		}
+	}
 	config.LondonBlock = londonBlock
 	config.ArrowGlacierBlock = londonBlock
 	config.GrayGlacierBlock = londonBlock
-	var engine consensus.Engine = beacon.New(ethash.NewFaker())
-	td := params.GenesisDifficulty.Uint64()
+	if cancunBlock != nil {
+		// Enable the merge with cancun fork.
+		config.MergeNetsplitBlock = cancunBlock
+	}
+	engine := beacon.New(ethash.NewFaker())
 
 	if cancunBlock != nil {
 		ts := gspec.Timestamp + cancunBlock.Uint64()*10 // fixed 10 sec block time in blockgen
 		config.ShanghaiTime = &ts
 		config.CancunTime = &ts
+		if !config.IsOptimism() {
+			config.BlobScheduleConfig = params.DefaultBlobSchedule
+		}
 		signer = types.LatestSigner(gspec.Config)
 	}
 
@@ -185,7 +211,13 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, cancunBlock *big.Int, pe
 		}
 		b.AddTx(types.MustSignNewTx(key, signer, txdata))
 
-		if cancunBlock != nil && b.Number().Cmp(cancunBlock) >= 0 {
+		if gspec.Config.IsOptimismBedrock(b.Number()) {
+			b.SetPoS()
+		}
+		if gspec.Config.IsOptimismHolocene(b.Timestamp()) {
+			b.SetExtra(eip1559.EncodeHoloceneExtraData(*gspec.Config.Optimism.EIP1559DenominatorCanyon, gspec.Config.Optimism.EIP1559Elasticity))
+		}
+		if cancunBlock != nil && b.Number().Cmp(cancunBlock) >= 0 && gspec.Config.BlobScheduleConfig != nil {
 			b.SetPoS()
 
 			// put more blobs in each new block
@@ -206,10 +238,9 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, cancunBlock *big.Int, pe
 				b.AddTx(types.MustSignNewTx(key, signer, blobTx))
 			}
 		}
-		td += b.Difficulty().Uint64()
 	})
+
 	// Construct testing chain
-	gspec.Config.TerminalTotalDifficulty = new(big.Int).SetUint64(td)
 	chain, err := core.NewBlockChain(db, &core.CacheConfig{TrieCleanNoPrefetch: true}, gspec, nil, engine, vm.Config{}, nil)
 	if err != nil {
 		t.Fatalf("Failed to create local chain, %v", err)
@@ -247,7 +278,7 @@ func TestSuggestTipCap(t *testing.T) {
 		{big.NewInt(33), big.NewInt(params.GWei * int64(30))}, // Fork point in the future
 	}
 	for _, c := range cases {
-		backend := newTestBackend(t, c.fork, nil, false)
+		backend := newTestBackend(t, c.fork, nil, false, false)
 		oracle := NewOracle(backend, config, big.NewInt(params.GWei))
 
 		// The gas price sampled is: 32G, 31G, 30G, 29G, 28G, 27G

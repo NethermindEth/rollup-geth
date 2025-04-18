@@ -70,6 +70,7 @@ type environment struct {
 	tcount   int            // tx count in cycle
 	gasPool  *core.GasPool  // available gas used to pack transactions
 	coinbase common.Address
+	evm      *vm.EVM
 
 	header   *types.Header
 	txs      []*types.Transaction
@@ -99,6 +100,7 @@ type newPayloadResult struct {
 	sidecars []*types.BlobTxSidecar // collected blobs of blob transactions
 	stateDB  *state.StateDB         // StateDB after executing the transactions
 	receipts []*types.Receipt       // Receipts collected during construction
+	requests [][]byte               // Consensus layer requests collected during block construction
 	witness  *stateless.Witness     // Witness is an optional stateless proof
 }
 
@@ -180,14 +182,32 @@ func (miner *Miner) generateWork(params *generateParams, witness bool) *newPaylo
 	for _, r := range work.receipts {
 		allLogs = append(allLogs, r.Logs...)
 	}
-	// Read requests if Prague is enabled.
-	if miner.chainConfig.IsPrague(work.header.Number, work.header.Time) {
-		requests, err := core.ParseDepositLogs(allLogs, miner.chainConfig)
-		if err != nil {
+
+	isIsthmus := miner.chainConfig.IsIsthmus(work.header.Time)
+
+	// Collect consensus-layer requests if Prague is enabled.
+	var requests [][]byte
+	if miner.chainConfig.IsPrague(work.header.Number, work.header.Time) && !isIsthmus {
+		requests = [][]byte{}
+		// EIP-6110 deposits
+		if err := core.ParseDepositLogs(&requests, allLogs, miner.chainConfig); err != nil {
 			return &newPayloadResult{err: err}
 		}
-		body.Requests = requests
+		// EIP-7002
+		core.ProcessWithdrawalQueue(&requests, work.evm)
+		// EIP-7251 consolidations
+		core.ProcessConsolidationQueue(&requests, work.evm)
 	}
+
+	if isIsthmus {
+		requests = [][]byte{}
+	}
+
+	if requests != nil {
+		reqHash := types.CalcRequestsHash(requests)
+		work.header.RequestsHash = &reqHash
+	}
+
 	block, err := miner.engine.FinalizeAndAssemble(miner.chain, work.header, work.state, &body, work.receipts)
 	if err != nil {
 		return &newPayloadResult{err: err}
@@ -198,6 +218,7 @@ func (miner *Miner) generateWork(params *generateParams, witness bool) *newPaylo
 		sidecars: work.sidecars,
 		stateDB:  work.state,
 		receipts: work.receipts,
+		requests: requests,
 		witness:  work.witness,
 	}
 }
@@ -283,10 +304,7 @@ func (miner *Miner) prepareWork(genParams *generateParams, witness bool) (*envir
 	if miner.chainConfig.IsCancun(header.Number, header.Time) {
 		var excessBlobGas uint64
 		if miner.chainConfig.IsCancun(parent.Number, parent.Time) {
-			excessBlobGas = eip4844.CalcExcessBlobGas(*parent.ExcessBlobGas, *parent.BlobGasUsed)
-		} else {
-			// For the first post-fork block, both parent.data_gas_used and parent.excess_data_gas are evaluated as 0
-			excessBlobGas = eip4844.CalcExcessBlobGas(0, 0)
+			excessBlobGas = eip4844.CalcExcessBlobGas(miner.chainConfig, parent, timestamp)
 		}
 		header.BlobGasUsed = new(uint64)
 		header.ExcessBlobGas = &excessBlobGas
@@ -302,14 +320,10 @@ func (miner *Miner) prepareWork(genParams *generateParams, witness bool) (*envir
 	}
 	env.noTxs = genParams.noTxs
 	if header.ParentBeaconRoot != nil {
-		context := core.NewEVMBlockContext(header, miner.chain, nil, miner.chainConfig, env.state)
-		vmenv := vm.NewEVM(context, vm.TxContext{}, env.state, miner.chainConfig, vm.Config{})
-		core.ProcessBeaconBlockRoot(*header.ParentBeaconRoot, vmenv, env.state)
+		core.ProcessBeaconBlockRoot(*header.ParentBeaconRoot, env.evm)
 	}
 	if miner.chainConfig.IsPrague(header.Number, header.Time) {
-		context := core.NewEVMBlockContext(header, miner.chain, nil, miner.chainConfig, env.state)
-		vmenv := vm.NewEVM(context, vm.TxContext{}, env.state, miner.chainConfig, vm.Config{})
-		core.ProcessParentBlockHash(header.ParentHash, vmenv, env.state)
+		core.ProcessParentBlockHash(header.ParentHash, env.evm)
 	}
 	return env, nil
 }
@@ -348,6 +362,7 @@ func (miner *Miner) makeEnv(parent *types.Header, header *types.Header, coinbase
 		coinbase: coinbase,
 		header:   header,
 		witness:  state.Witness(),
+		evm:      vm.NewEVM(core.NewEVMBlockContext(header, miner.chain, &coinbase, miner.chainConfig, state), state, miner.chainConfig, vm.Config{}),
 		rpcCtx:   rpcCtx,
 	}, nil
 }
@@ -389,7 +404,8 @@ func (miner *Miner) commitBlobTransaction(env *environment, tx *types.Transactio
 	// isn't really a better place right now. The blob gas limit is checked at block validation time
 	// and not during execution. This means core.ApplyTransaction will not return an error if the
 	// tx has too many blobs. So we have to explicitly check it here.
-	if (env.blobs+len(sc.Blobs))*params.BlobTxBlobGasPerBlob > params.MaxBlobGasPerBlock {
+	maxBlobs := eip4844.MaxBlobsPerBlock(miner.chainConfig, env.header.Time)
+	if env.blobs+len(sc.Blobs) > maxBlobs {
 		return errors.New("max data blobs reached")
 	}
 	receipt, err := miner.applyTransaction(env, tx)
@@ -405,37 +421,19 @@ func (miner *Miner) commitBlobTransaction(env *environment, tx *types.Transactio
 	return nil
 }
 
-type LogInspector interface {
-	GetLogs(hash common.Hash, blockNumber uint64, blockHash common.Hash) []*types.Log
-}
-
 // applyTransaction runs the transaction. If execution fails, state and gas pool are reverted.
 func (miner *Miner) applyTransaction(env *environment, tx *types.Transaction) (*types.Receipt, error) {
 	var (
 		snap = env.state.Snapshot()
 		gp   = env.gasPool.Gas()
 	)
-	var extraOpts *core.ApplyTransactionOpts
-	// If not just reproducing the block, check the interop executing messages.
 	if !env.noTxs && miner.chain.Config().IsInterop(env.header.Time) {
-		// Whenever there are `noTxs` it means we are building a block from pre-determined txs. There are two cases:
-		//	(1) it's derived from L1, and will be verified asynchronously by the op-node.
-		//	(2) it is a deposits-only empty-block by the sequencer, in which case there are no interop-txs to verify (as deposits do not emit any).
-
-		// We have to insert as call-back, since we cannot revert the snapshot
-		// after the tx is deemed successful and the journal has been cleared already.
-		extraOpts = &core.ApplyTransactionOpts{
-			PostValidation: func(evm *vm.EVM, result *core.ExecutionResult) error {
-				logInspector, ok := evm.StateDB.(LogInspector)
-				if !ok {
-					return fmt.Errorf("cannot get logs from StateDB type %T", evm.StateDB)
-				}
-				logs := logInspector.GetLogs(tx.Hash(), env.header.Number.Uint64(), common.Hash{})
-				return miner.checkInterop(env.rpcCtx, tx, result.Failed(), logs)
-			},
+		// avoid execution if the interop check fails
+		if err := miner.checkInterop(env.rpcCtx, tx, env.header.Time); err != nil {
+			return nil, err
 		}
 	}
-	receipt, err := core.ApplyTransactionExtended(miner.chainConfig, miner.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, vm.Config{}, extraOpts)
+	receipt, err := core.ApplyTransaction(env.evm, env.gasPool, env.state, env.header, tx, &env.header.GasUsed)
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		env.gasPool.SetGas(gp)
@@ -443,12 +441,9 @@ func (miner *Miner) applyTransaction(env *environment, tx *types.Transaction) (*
 	return receipt, err
 }
 
-func (miner *Miner) checkInterop(ctx context.Context, tx *types.Transaction, failed bool, logs []*types.Log) error {
+func (miner *Miner) checkInterop(ctx context.Context, tx *types.Transaction, logTimestamp uint64) error {
 	if tx.Type() == types.DepositTxType {
 		return nil // deposit-txs are always safe
-	}
-	if failed {
-		return nil // failed txs don't persist any logs
 	}
 	if tx.Rejected() {
 		return errors.New("transaction was previously rejected")
@@ -460,16 +455,13 @@ func (miner *Miner) checkInterop(ctx context.Context, tx *types.Transaction, fai
 	if ctx == nil { // check if the miner was set up correctly to interact with an RPC
 		return errors.New("need RPC context to check executing messages")
 	}
-	executingMessages, err := interoptypes.ExecutingMessagesFromLogs(logs)
-	if err != nil {
-		return fmt.Errorf("cannot parse interop messages from receipt of %s: %w", tx.Hash(), err)
-	}
-	if len(executingMessages) == 0 {
+	accessList := interoptypes.TxToInteropAccessList(tx)
+	if len(accessList) == 0 {
 		return nil // avoid an RPC check if there are no executing messages to verify.
 	}
-	if err := b.CheckMessages(ctx, executingMessages, interoptypes.CrossUnsafe); err != nil {
+	if err := b.CheckAccessList(ctx, accessList, interoptypes.CrossUnsafe, interoptypes.ExecutingDescriptor{Timestamp: logTimestamp, Timeout: 0}); err != nil {
 		if ctx.Err() != nil { // don't reject transactions permanently on RPC timeouts etc.
-			log.Debug("CheckMessages timed out", "err", ctx.Err())
+			log.Debug("CheckAccessList timed out", "err", ctx.Err())
 			return err
 		}
 		txInteropRejectedCounter.Inc(1)
@@ -499,7 +491,7 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 		}
 		// If we don't have enough blob space for any further blob transactions,
 		// skip that list altogether
-		if !blobTxs.Empty() && env.blobs*params.BlobTxBlobGasPerBlob >= params.MaxBlobGasPerBlock {
+		if !blobTxs.Empty() && env.blobs >= eip4844.MaxBlobsPerBlock(miner.chainConfig, env.header.Time) {
 			log.Trace("Not enough blob space for further blob transactions")
 			blobTxs.Clear()
 			// Fall though to pick up any plain txs
@@ -533,11 +525,20 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 			txs.Pop()
 			continue
 		}
-		if left := uint64(params.MaxBlobGasPerBlock - env.blobs*params.BlobTxBlobGasPerBlob); left < ltx.BlobGas {
-			log.Trace("Not enough blob gas left for transaction", "hash", ltx.Hash, "left", left, "needed", ltx.BlobGas)
-			txs.Pop()
-			continue
+
+		// Most of the blob gas logic here is agnostic as to if the chain supports
+		// blobs or not, however the max check panics when called on a chain without
+		// a defined schedule, so we need to verify it's safe to call.
+		if miner.chainConfig.IsCancun(env.header.Number, env.header.Time) {
+			left := eip4844.MaxBlobsPerBlock(miner.chainConfig, env.header.Time) - env.blobs
+			if left < int(ltx.BlobGas/params.BlobTxBlobGasPerBlob) {
+				log.Trace("Not enough blob space left for transaction", "hash", ltx.Hash, "left", left, "needed", ltx.BlobGas/params.BlobTxBlobGasPerBlob)
+				txs.Pop()
+				continue
+			}
 		}
+
+		// OP-Stack addition: sequencer throttling
 		daBytesAfter := new(big.Int)
 		if ltx.DABytes != nil && miner.config.MaxDABlockSize != nil {
 			daBytesAfter.Add(blockDABytes, ltx.DABytes)
@@ -545,9 +546,16 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 				log.Debug("adding tx would exceed block DA size limit",
 					"hash", ltx.Hash, "txda", ltx.DABytes, "blockda", blockDABytes, "dalimit", miner.config.MaxDABlockSize)
 				txs.Pop()
+				// If the number of remaining bytes is too few to hold even the minimum possible transaction size,
+				// then we can stop early.
+				daBytesRemaining := new(big.Int).Sub(miner.config.MaxDABlockSize, daBytesAfter)
+				if daBytesRemaining.Cmp(types.MinTransactionSize) < 0 {
+					break
+				}
 				continue
 			}
 		}
+
 		// Transaction seems to fit, pull it up from the pool
 		tx := ltx.Resolve()
 		if tx == nil {
@@ -555,6 +563,7 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 			txs.Pop()
 			continue
 		}
+
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance in the transaction pool.
 		from, _ := types.Sender(env.signer, tx)
@@ -614,6 +623,7 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) error {
 	miner.confMu.RLock()
 	tip := miner.config.GasPrice
+	prio := miner.prio
 	miner.confMu.RUnlock()
 
 	// Retrieve the pending transactions pre-filtered by the 1559/4844 dynamic fees
@@ -625,7 +635,7 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 		filter.BaseFee = uint256.MustFromBig(env.header.BaseFee)
 	}
 	if env.header.ExcessBlobGas != nil {
-		filter.BlobFee = uint256.MustFromBig(eip4844.CalcBlobFee(*env.header.ExcessBlobGas))
+		filter.BlobFee = uint256.MustFromBig(eip4844.CalcBlobFee(miner.chainConfig, env.header))
 	}
 	filter.OnlyPlainTxs, filter.OnlyBlobTxs = true, false
 	pendingPlainTxs := miner.txpool.Pending(filter)
@@ -634,31 +644,31 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 	pendingBlobTxs := miner.txpool.Pending(filter)
 
 	// Split the pending transactions into locals and remotes.
-	localPlainTxs, remotePlainTxs := make(map[common.Address][]*txpool.LazyTransaction), pendingPlainTxs
-	localBlobTxs, remoteBlobTxs := make(map[common.Address][]*txpool.LazyTransaction), pendingBlobTxs
+	prioPlainTxs, normalPlainTxs := make(map[common.Address][]*txpool.LazyTransaction), pendingPlainTxs
+	prioBlobTxs, normalBlobTxs := make(map[common.Address][]*txpool.LazyTransaction), pendingBlobTxs
 
-	for _, account := range miner.txpool.Locals() {
-		if txs := remotePlainTxs[account]; len(txs) > 0 {
-			delete(remotePlainTxs, account)
-			localPlainTxs[account] = txs
+	for _, account := range prio {
+		if txs := normalPlainTxs[account]; len(txs) > 0 {
+			delete(normalPlainTxs, account)
+			prioPlainTxs[account] = txs
 		}
-		if txs := remoteBlobTxs[account]; len(txs) > 0 {
-			delete(remoteBlobTxs, account)
-			localBlobTxs[account] = txs
+		if txs := normalBlobTxs[account]; len(txs) > 0 {
+			delete(normalBlobTxs, account)
+			prioBlobTxs[account] = txs
 		}
 	}
 	// Fill the block with all available pending transactions.
-	if len(localPlainTxs) > 0 || len(localBlobTxs) > 0 {
-		plainTxs := newTransactionsByPriceAndNonce(env.signer, localPlainTxs, env.header.BaseFee)
-		blobTxs := newTransactionsByPriceAndNonce(env.signer, localBlobTxs, env.header.BaseFee)
+	if len(prioPlainTxs) > 0 || len(prioBlobTxs) > 0 {
+		plainTxs := newTransactionsByPriceAndNonce(env.signer, prioPlainTxs, env.header.BaseFee)
+		blobTxs := newTransactionsByPriceAndNonce(env.signer, prioBlobTxs, env.header.BaseFee)
 
 		if err := miner.commitTransactions(env, plainTxs, blobTxs, interrupt); err != nil {
 			return err
 		}
 	}
-	if len(remotePlainTxs) > 0 || len(remoteBlobTxs) > 0 {
-		plainTxs := newTransactionsByPriceAndNonce(env.signer, remotePlainTxs, env.header.BaseFee)
-		blobTxs := newTransactionsByPriceAndNonce(env.signer, remoteBlobTxs, env.header.BaseFee)
+	if len(normalPlainTxs) > 0 || len(normalBlobTxs) > 0 {
+		plainTxs := newTransactionsByPriceAndNonce(env.signer, normalPlainTxs, env.header.BaseFee)
+		blobTxs := newTransactionsByPriceAndNonce(env.signer, normalBlobTxs, env.header.BaseFee)
 
 		if err := miner.commitTransactions(env, plainTxs, blobTxs, interrupt); err != nil {
 			return err

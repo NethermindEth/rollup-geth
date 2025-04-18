@@ -167,3 +167,47 @@ const (
 	Unsafe      SafetyLevel = "unsafe"
 	Invalid     SafetyLevel = "invalid"
 )
+
+type ExecutingDescriptor struct {
+	Timestamp uint64
+	Timeout   uint64
+}
+
+type executingDescriptorMarshaling struct {
+	Timestamp hexutil.Uint64 `json:"timestamp"`
+	Timeout   hexutil.Uint64 `json:"timeout"`
+}
+
+func (ed ExecutingDescriptor) MarshalJSON() ([]byte, error) {
+	var enc executingDescriptorMarshaling
+	enc.Timestamp = hexutil.Uint64(ed.Timestamp)
+	enc.Timeout = hexutil.Uint64(ed.Timeout)
+	return json.Marshal(&enc)
+}
+
+func (ed *ExecutingDescriptor) UnmarshalJSON(input []byte) error {
+	var dec executingDescriptorMarshaling
+	if err := json.Unmarshal(input, &dec); err != nil {
+		return err
+	}
+	ed.Timestamp = uint64(dec.Timestamp)
+	ed.Timeout = uint64(dec.Timeout)
+	return nil
+}
+
+func TxToInteropAccessList(tx *types.Transaction) []common.Hash {
+	if tx == nil {
+		return nil
+	}
+	al := tx.AccessList()
+	if len(al) == 0 {
+		return nil
+	}
+	var hashes []common.Hash
+	for i := range al {
+		if al[i].Address == params.InteropCrossL2InboxAddress {
+			hashes = append(hashes, al[i].StorageKeys...)
+		}
+	}
+	return hashes
+}

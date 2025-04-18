@@ -24,7 +24,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
@@ -57,7 +56,7 @@ func VerifyEIP1559Header(config *params.ChainConfig, parent, header *types.Heade
 	return nil
 }
 
-// DecodeHolocene1599Params extracts the Holcene 1599 parameters from the encoded form defined here:
+// DecodeHolocene1559Params extracts the Holcene 1599 parameters from the encoded form defined here:
 // https://github.com/ethereum-optimism/specs/blob/main/specs/protocol/holocene/exec-engine.md#eip-1559-parameters-in-payloadattributesv3
 //
 // Returns 0,0 if the format is invalid, though ValidateHolocene1559Params should be used instead of this function for
@@ -167,9 +166,10 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, time uint64) 
 		num.Mul(num, parent.BaseFee)
 		num.Div(num, denom.SetUint64(parentGasTarget))
 		num.Div(num, denom.SetUint64(denominator))
-		baseFeeDelta := math.BigMax(num, common.Big1)
-
-		return num.Add(parent.BaseFee, baseFeeDelta)
+		if num.Cmp(common.Big1) < 0 {
+			return num.Add(parent.BaseFee, common.Big1)
+		}
+		return num.Add(parent.BaseFee, num)
 	} else {
 		// Otherwise if the parent block used less gas than its target, the baseFee should decrease.
 		// max(0, parentBaseFee * gasUsedDelta / parentGasTarget / baseFeeChangeDenominator)
@@ -177,8 +177,11 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, time uint64) 
 		num.Mul(num, parent.BaseFee)
 		num.Div(num, denom.SetUint64(parentGasTarget))
 		num.Div(num, denom.SetUint64(denominator))
-		baseFee := num.Sub(parent.BaseFee, num)
 
-		return math.BigMax(baseFee, common.Big0)
+		baseFee := num.Sub(parent.BaseFee, num)
+		if baseFee.Cmp(common.Big0) < 0 {
+			baseFee = common.Big0
+		}
+		return baseFee
 	}
 }
