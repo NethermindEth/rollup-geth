@@ -47,6 +47,47 @@ func NewStateProcessor(config *params.ChainConfig, chain *HeaderChain) *StatePro
 	}
 }
 
+// L1OriginSource is a system contract to expose L1 origin data based on RIP-7859.
+type L1OriginSource struct {
+	blockHash        common.Hash
+	parentBeaconRoot common.Hash
+	stateRoot        common.Hash
+	receiptRoot      common.Hash
+	transactionRoot  common.Hash
+	blockHeight      *big.Int
+}
+
+// Bytes encodes the L1OriginSource data into a byte slice for processing by the L1Origin contract.
+// It encodes the function signature for updateL1BlockData followed by the parameters.
+func (l *L1OriginSource) Bytes() []byte {
+	// Function signature: updateL1BlockData(uint256,bytes32,bytes32,bytes32,bytes32,bytes32)
+	methodID := crypto.Keccak256([]byte("updateL1BlockData(uint256,bytes32,bytes32,bytes32,bytes32,bytes32)"))[0:4]
+
+	data := make([]byte, 4+32*6) // 4 bytes for method ID + 6 parameters of 32 bytes each
+	copy(data[0:4], methodID)
+
+	// Pack the height parameter (uint256)
+	heightBytes := common.LeftPadBytes(l.blockHeight.Bytes(), 32)
+	copy(data[4:36], heightBytes)
+
+	// Pack the block hash (bytes32)
+	copy(data[36:68], l.blockHash[:])
+
+	// Pack the parent beacon root (bytes32)
+	copy(data[68:100], l.parentBeaconRoot[:])
+
+	// Pack the state root (bytes32)
+	copy(data[100:132], l.stateRoot[:])
+
+	// Pack the receipt root (bytes32)
+	copy(data[132:164], l.receiptRoot[:])
+
+	// Pack the transaction root (bytes32)
+	copy(data[164:196], l.transactionRoot[:])
+
+	return data
+}
+
 // Process processes the state changes according to the Ethereum rules by running
 // the transaction messages using the statedb and applying any rewards to both
 // the processor (coinbase) and any included uncles.
@@ -277,6 +318,36 @@ func ProcessParentBlockHash(prevHash common.Hash, evm *vm.EVM) {
 	}
 	evm.SetTxContext(NewEVMTxContext(msg))
 	evm.StateDB.AddAddressToAccessList(params.HistoryStorageAddress)
+	_, _, err := evm.Call(msg.From, *msg.To, msg.Data, 30_000_000, common.U2560)
+	if err != nil {
+		panic(err)
+	}
+	if evm.StateDB.AccessEvents() != nil {
+		evm.StateDB.AccessEvents().Merge(evm.AccessEvents)
+	}
+	evm.StateDB.Finalise(true)
+}
+
+// ProcessL1BlockInfo stores the L1 block info in the L1OriginSource contract
+// as per RIP-7859.
+func ProcessL1BlockInfo(l1OriginSource *L1OriginSource, evm *vm.EVM) {
+	if tracer := evm.Config.Tracer; tracer != nil {
+		onSystemCallStart(tracer, evm.GetVMContext())
+		if tracer.OnSystemCallEnd != nil {
+			defer tracer.OnSystemCallEnd()
+		}
+	}
+	msg := &Message{
+		From:      params.SystemAddress,
+		GasLimit:  30_000_000,
+		GasPrice:  common.Big0,
+		GasFeeCap: common.Big0,
+		GasTipCap: common.Big0,
+		To:        &params.L1OriginContractAddress,
+		Data:      l1OriginSource.Bytes(),
+	}
+	evm.SetTxContext(NewEVMTxContext(msg))
+	evm.StateDB.AddAddressToAccessList(params.L1OriginContractAddress)
 	_, _, err := evm.Call(msg.From, *msg.To, msg.Data, 30_000_000, common.U2560)
 	if err != nil {
 		panic(err)
