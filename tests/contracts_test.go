@@ -53,7 +53,7 @@ func TestSlotPrecompile(t *testing.T) {
 			}
 
 			// Verify the result
-			expected := []byte{0, 0, 0, 0, 0, 0, 0, 0} // Will be overwritten by PutUint64
+			expected := []byte{0, 0, 0, 0, 0, 0, 0, 0}
 			binary.BigEndian.PutUint64(expected, slotValue)
 
 			if !bytes.Equal(result, expected) {
@@ -80,6 +80,7 @@ func TestSlotPrecompile(t *testing.T) {
 		}
 
 		engine := ethash.NewFaker()
+		//engine := beacon.New(ethash.NewFaker())
 		numBlocks := 5
 		nonce := uint64(0)
 		recipient := common.HexToAddress("plzwork")
@@ -99,8 +100,8 @@ func TestSlotPrecompile(t *testing.T) {
 			}
 			gen.AddTx(signedTx)
 			nonce++
-			slotNumber := gen.Number().Uint64()
-
+			slotNumber := gen.Number().Uint64() // this returns the block number
+			gen.SetSlotNumber(slotNumber)
 			chainRules := params.MergedTestChainConfig.Rules(gen.Number(), true, gen.Timestamp())
 			precompiles := vm.ActivePrecompiledContracts(chainRules)
 			SlotPrecompile, exists := precompiles[SlotPrecompileAddr]
