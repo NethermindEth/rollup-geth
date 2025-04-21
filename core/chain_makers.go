@@ -405,31 +405,6 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 			evm := vm.NewEVM(blockContext, statedb, cm.config, vm.Config{})
 			ProcessParentBlockHash(b.header.ParentHash, evm)
 		}
-		if config.IsCommonCoreV1(b.header.Number, b.header.Time) {
-			// RIP-7859, populate the L1OriginSource contract
-			blockContext := NewEVMBlockContext(b.header, cm, &b.header.Coinbase)
-			blockContext.Random = &common.Hash{} // enable post-merge instruction set
-			evm := vm.NewEVM(blockContext, statedb, cm.config, vm.Config{})
-
-			parent := cm.GetBlock(b.header.ParentHash, b.header.Number.Uint64()-1)
-			parentHeader := parent.Header()
-
-			l1OriginSource := &L1OriginSource{
-				blockHash:        parent.Hash(),                         // L1 block hash
-				stateRoot:        parent.Root(),                         // L1 state root
-				receiptRoot:      parent.ReceiptHash(),                  // L1 receipt root
-				transactionRoot:  parent.TxHash(),                       // L1 transaction root
-				blockHeight:      new(big.Int).Set(parentHeader.Number), // L1 block height
-				parentBeaconRoot: common.Hash{},                         // Dummy value
-			}
-
-			// If the L1 block has a beacon root, use that
-			if beaconRoot := parent.BeaconRoot(); beaconRoot != nil {
-				l1OriginSource.parentBeaconRoot = *beaconRoot
-			}
-
-			ProcessL1BlockInfo(l1OriginSource, evm)
-		}
 
 		// Execute any user modifications to the block
 		if gen != nil {
