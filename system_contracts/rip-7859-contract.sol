@@ -3,14 +3,14 @@ pragma solidity ^0.8.19;
 
 interface L1OriginSource {
     function getL1OriginBlockHash() external view returns (bytes32 blockHash);
-    function getL1OriginParentBeaconRoot() external view returns (bytes32 blockHash);
+    function getL1OriginParentBeaconRoot() external view returns (bytes32 beaconRoot);
     function getL1OriginStateRoot() external view returns (bytes32 stateRoot);
     function getL1OriginReceiptRoot() external view returns (bytes32 receiptRoot);
     function getL1OriginTransactionRoot() external view returns (bytes32 transactionRoot);
     function getL1OriginBlockHeight() external view returns (uint256 blockHeight);
 
     function getL1OriginBlockHashAt(uint256 height) external view returns (bytes32 blockHash);
-    function getL1OriginParentBeaconRootAt(uint256 height) external view returns (bytes32 blockHash);
+    function getL1OriginParentBeaconRootAt(uint256 height) external view returns (bytes32 beaconRoot);
     function getL1OriginStateRootAt(uint256 height) external view returns (bytes32 stateRoot);
     function getL1OriginReceiptRootAt(uint256 height) external view returns (bytes32 receiptRoot);
     function getL1OriginTransactionRootAt(uint256 height) external view returns (bytes32 transactionRoot);
@@ -72,6 +72,11 @@ contract L1OriginSourceImpl is L1OriginSource {
         bytes32 transactionRoot
     ) external onlySystem {
         require(height > 0, "L1OriginSourceImpl: height cannot be zero");
+        require(blockHash > 0, "L1OriginSourceImpl: blockHash cannot be zero");
+        require(parentBeaconRoot > 0, "L1OriginSourceImpl: parentBeaconRoot cannot be zero");
+        require(stateRoot > 0, "L1OriginSourceImpl: stateRoot cannot be zero");
+        require(receiptRoot > 0, "L1OriginSourceImpl: receiptRoot cannot be zero");
+        require(transactionRoot > 0, "L1OriginSourceImpl: transactionRoot cannot be zero");
 
         // Store in the buffer using modulo to get the buffer index
         uint256 bufferIndex = height % MAX_STORED_BLOCKS;
@@ -111,7 +116,7 @@ contract L1OriginSourceImpl is L1OriginSource {
         return _getBlockDataAt(currentL1BlockHeight).blockHash;
     }
 
-    function getL1OriginParentBeaconRoot() external view override returns (bytes32 blockHash) {
+    function getL1OriginParentBeaconRoot() external view override returns (bytes32 beaconRoot) {
         require(currentL1BlockHeight > 0, "L1OriginSourceImpl: no L1 blocks available");
         return _getBlockDataAt(currentL1BlockHeight).parentBeaconRoot;
     }
@@ -139,7 +144,7 @@ contract L1OriginSourceImpl is L1OriginSource {
         return _getBlockDataAt(height).blockHash;
     }
 
-    function getL1OriginParentBeaconRootAt(uint256 height) external view override returns (bytes32 blockHash) {
+    function getL1OriginParentBeaconRootAt(uint256 height) external view override returns (bytes32 beaconRoot) {
         return _getBlockDataAt(height).parentBeaconRoot;
     }
 
