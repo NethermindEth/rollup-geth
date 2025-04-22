@@ -1193,7 +1193,7 @@ func kZGToVersionedHash(kzg kzg4844.Commitment) common.Hash {
 
 // slotPrecompile is a precompile that returns the current slot number as an 8-byte uint64 in big-endian encoding
 type SlotPrecompile struct {
-	SlotNumber uint64
+	SlotFn func() uint64
 }
 
 // RequiredGas returns the gas required to execute the precompiled contract.
@@ -1205,8 +1205,13 @@ func (c *SlotPrecompile) RequiredGas(input []byte) uint64 {
 // Run returns the current slot number of the block as an 8-byte uint64 in big-endian encoding.
 func (c *SlotPrecompile) Run(input []byte) ([]byte, error) {
 
+	if c.SlotFn == nil {
+		return nil, fmt.Errorf("slot precompile: no slot provided")
+	}
+	slot := c.SlotFn()
+
 	slotBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(slotBytes, c.SlotNumber)
+	binary.BigEndian.PutUint64(slotBytes, slot)
 
 	return slotBytes, nil
 }

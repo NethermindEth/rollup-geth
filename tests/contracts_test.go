@@ -37,7 +37,10 @@ func TestSlotPrecompile(t *testing.T) {
 		slotValues := []uint64{123, 456, 789}
 
 		for _, slotValue := range slotValues {
-			mockPrecompile := &vm.SlotPrecompile{SlotNumber: slotValue}
+			mockPrecompile := &vm.SlotPrecompile{}
+			mockPrecompile.SlotFn = func() uint64 {
+				return slotValue
+			}
 
 			// Run the precompile
 			input := []byte{}
@@ -100,14 +103,17 @@ func TestSlotPrecompile(t *testing.T) {
 			}
 			gen.AddTx(signedTx)
 			nonce++
-			slotNumber := gen.Number().Uint64() // this returns the block number
-			gen.SetSlotNumber(slotNumber)
+			slotNumber := gen.Number().Uint64() // this returns the block number not slot number
+			//gen.SetSlotNumber(slotNumber)
+
 			chainRules := params.MergedTestChainConfig.Rules(gen.Number(), true, gen.Timestamp())
 			precompiles := vm.ActivePrecompiledContracts(chainRules)
 			SlotPrecompile, exists := precompiles[SlotPrecompileAddr]
 			if !exists {
 				t.Fatalf("SlotPrecompile not found at address %s", SlotPrecompileAddr.Hex())
 			}
+
+			SlotPrecompile.(*vm.SlotPrecompile).SlotFn = func() uint64 { return slotNumber }
 
 			input := []byte{}
 			gas := SlotPrecompile.RequiredGas(input)
