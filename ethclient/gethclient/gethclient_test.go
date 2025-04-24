@@ -26,6 +26,8 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -49,9 +51,9 @@ var (
 	testBalance  = big.NewInt(2e15)
 )
 
-func newTestBackend(t *testing.T) (*node.Node, []*types.Block) {
+func newTestBackend(t *testing.T, chainConfig *params.ChainConfig) (*node.Node, []*types.Block) {
 	// Generate test chain.
-	genesis, blocks := generateTestChain()
+	genesis, blocks := generateTestChain(chainConfig)
 	// Create node
 	n, err := node.New(&node.Config{})
 	if err != nil {
@@ -79,13 +81,17 @@ func newTestBackend(t *testing.T) (*node.Node, []*types.Block) {
 	return n, blocks
 }
 
-func generateTestChain() (*core.Genesis, []*types.Block) {
+func generateTestChain(chainConfig *params.ChainConfig) (*core.Genesis, []*types.Block) {
+	if chainConfig == nil {
+		chainConfig = params.AllEthashProtocolChanges
+	}
 	genesis := &core.Genesis{
-		Config: params.AllEthashProtocolChanges,
+		Config: chainConfig,
 		Alloc: types.GenesisAlloc{
-			testAddr:     {Balance: testBalance, Storage: map[common.Hash]common.Hash{testSlot: testValue}},
-			testContract: {Nonce: 1, Code: []byte{0x13, 0x37}},
-			testEmpty:    {Balance: big.NewInt(1)},
+			testAddr:                       {Balance: testBalance, Storage: map[common.Hash]common.Hash{testSlot: testValue}},
+			testContract:                   {Nonce: 1, Code: []byte{0x13, 0x37}},
+			testEmpty:                      {Balance: big.NewInt(1)},
+			params.L1OriginContractAddress: {Nonce: 1, Code: params.L1OriginContractCode, Balance: common.Big0},
 		},
 		ExtraData: []byte("test genesis"),
 		Timestamp: 9000,
@@ -94,13 +100,21 @@ func generateTestChain() (*core.Genesis, []*types.Block) {
 		g.OffsetTime(5)
 		g.SetExtra([]byte("test"))
 	}
-	_, blocks, _ := core.GenerateChainWithGenesis(genesis, ethash.NewFaker(), 1, generate)
+
+	var engine consensus.Engine
+	if chainConfig.TerminalTotalDifficulty != nil && chainConfig.TerminalTotalDifficulty.Sign() == 0 {
+		engine = beacon.New(ethash.NewFaker())
+	} else {
+		engine = ethash.NewFaker()
+	}
+
+	_, blocks, _ := core.GenerateChainWithGenesis(genesis, engine, 1, generate)
 	blocks = append([]*types.Block{genesis.ToBlock()}, blocks...)
 	return genesis, blocks
 }
 
 func TestGethClient(t *testing.T) {
-	backend, _ := newTestBackend(t)
+	backend, _ := newTestBackend(t, nil)
 	client := backend.Attach()
 	defer backend.Close()
 	defer client.Close()
@@ -597,5 +611,133 @@ func testCallContractWithBlockOverrides(t *testing.T, client *rpc.Client) {
 	}
 	if !bytes.Equal(res, common.FromHex("0x1111111111111111111111111111111111111111")) {
 		t.Fatalf("unexpected result: %x", res)
+	}
+}
+
+func TestProcessL1OriginBlockInfo(t *testing.T) {
+	// Create a merged test chain which is required to run the L1OriginSource contract
+	chainConfig := params.MergedTestChainConfig
+	backend, _ := newTestBackend(t, chainConfig)
+	client := backend.Attach()
+	defer backend.Close()
+	defer client.Close()
+
+	ec := New(client)
+
+	// Test cases
+	tests := []struct {
+		name             string
+		blockHash        common.Hash
+		parentBeaconRoot common.Hash
+		stateRoot        common.Hash
+		receiptRoot      common.Hash
+		transactionRoot  common.Hash
+		blockHeight      *big.Int
+		wantErr          bool
+		errContains      string
+	}{
+		{
+			name:             "Valid data",
+			blockHash:        common.Hash{0x01},
+			parentBeaconRoot: common.Hash{0x02},
+			stateRoot:        common.Hash{0x03},
+			receiptRoot:      common.Hash{0x04},
+			transactionRoot:  common.Hash{0x05},
+			blockHeight:      big.NewInt(100),
+			wantErr:          false,
+		},
+		{
+			name:             "Zero Height",
+			blockHash:        common.Hash{0x01},
+			parentBeaconRoot: common.Hash{0x02},
+			stateRoot:        common.Hash{0x03},
+			receiptRoot:      common.Hash{0x04},
+			transactionRoot:  common.Hash{0x05},
+			blockHeight:      big.NewInt(0), // Invalid height
+			wantErr:          true,
+			errContains:      "execution reverted",
+		},
+		{
+			name:             "Zero BlockHash",
+			blockHash:        common.Hash{}, // Invalid block hash
+			parentBeaconRoot: common.Hash{0x02},
+			stateRoot:        common.Hash{0x03},
+			receiptRoot:      common.Hash{0x04},
+			transactionRoot:  common.Hash{0x05},
+			blockHeight:      big.NewInt(100),
+			wantErr:          true,
+			errContains:      "execution reverted",
+		},
+		{
+			name:             "Zero ParentBeaconRoot",
+			blockHash:        common.Hash{0x01},
+			parentBeaconRoot: common.Hash{}, // Invalid parent beacon root
+			stateRoot:        common.Hash{0x03},
+			receiptRoot:      common.Hash{0x04},
+			transactionRoot:  common.Hash{0x05},
+			blockHeight:      big.NewInt(100),
+			wantErr:          true,
+			errContains:      "execution reverted",
+		},
+		{
+			name:             "Zero StateRoot",
+			blockHash:        common.Hash{0x01},
+			parentBeaconRoot: common.Hash{0x02},
+			stateRoot:        common.Hash{}, // Invalid state root
+			receiptRoot:      common.Hash{0x04},
+			transactionRoot:  common.Hash{0x05},
+			blockHeight:      big.NewInt(100),
+			wantErr:          true,
+			errContains:      "execution reverted",
+		},
+		{
+			name:             "Zero ReceiptRoot",
+			blockHash:        common.Hash{0x01},
+			parentBeaconRoot: common.Hash{0x02},
+			stateRoot:        common.Hash{0x03},
+			receiptRoot:      common.Hash{}, // Invalid receipt root
+			transactionRoot:  common.Hash{0x05},
+			blockHeight:      big.NewInt(100),
+			wantErr:          true,
+			errContains:      "execution reverted",
+		},
+		{
+			name:             "Zero TransactionRoot",
+			blockHash:        common.Hash{0x01},
+			parentBeaconRoot: common.Hash{0x02},
+			stateRoot:        common.Hash{0x03},
+			receiptRoot:      common.Hash{0x04},
+			transactionRoot:  common.Hash{}, // Invalid transaction root
+			blockHeight:      big.NewInt(100),
+			wantErr:          true,
+			errContains:      "execution reverted",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ec.ProcessL1OriginBlockInfo(
+				context.Background(),
+				tt.blockHash,
+				tt.parentBeaconRoot,
+				tt.stateRoot,
+				tt.receiptRoot,
+				tt.transactionRoot,
+				tt.blockHeight,
+			)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error but got none")
+				}
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Fatalf("expected error containing %q but got %v", tt.errContains, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			}
+		})
 	}
 }

@@ -204,6 +204,12 @@ func (ec *Client) SubscribePendingTransactions(ctx context.Context, ch chan<- co
 	return ec.c.EthSubscribe(ctx, ch, "newPendingTransactions")
 }
 
+// ProcessL1OriginBlockInfo stores the L1 block info in the L1OriginSource contract
+// as defined in RIP-7859.
+func (ec *Client) ProcessL1OriginBlockInfo(ctx context.Context, blockHash common.Hash, parentBeaconRoot common.Hash, stateRoot common.Hash, receiptRoot common.Hash, transactionRoot common.Hash, blockHeight *big.Int) error {
+	return ec.c.CallContext(ctx, nil, "eth_processL1OriginBlockInfo", blockHash, parentBeaconRoot, stateRoot, receiptRoot, transactionRoot, toBlockNumArg(blockHeight))
+}
+
 func toBlockNumArg(number *big.Int) string {
 	if number == nil {
 		return "latest"
