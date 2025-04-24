@@ -2080,3 +2080,25 @@ func checkTxFee(gasPrice *big.Int, gas uint64, cap float64) error {
 func CheckTxFee(gasPrice *big.Int, gas uint64, cap float64) error {
 	return checkTxFee(gasPrice, gas, cap)
 }
+
+// ProcessL1OriginBlockInfo stores the L1 block info in the L1OriginSource contract
+// as defined in RIP-7859.
+func (api *BlockChainAPI) ProcessL1OriginBlockInfo(ctx context.Context, blockHash common.Hash, parentBeaconRoot common.Hash, stateRoot common.Hash, receiptRoot common.Hash, transactionRoot common.Hash, blockHeight *hexutil.Big) error {
+	l1OriginSource := &core.L1OriginSource{
+		BlockHash:        blockHash,
+		ParentBeaconRoot: parentBeaconRoot,
+		StateRoot:        stateRoot,
+		ReceiptRoot:      receiptRoot,
+		TransactionRoot:  transactionRoot,
+		BlockHeight:      (*big.Int)(blockHeight),
+	}
+
+	state, header, err := api.b.StateAndHeaderByNumberOrHash(ctx, rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber))
+	if state == nil || err != nil {
+		return err
+	}
+
+	blockCtx := core.NewEVMBlockContext(header, NewChainContext(ctx, api.b), nil, api.b.ChainConfig(), state)
+	evm := api.b.GetEVM(ctx, state, header, &vm.Config{}, &blockCtx)
+	return core.ProcessL1OriginBlockInfo(l1OriginSource, evm)
+}

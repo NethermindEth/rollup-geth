@@ -81,12 +81,12 @@ func TestL1OriginSource(t *testing.T) {
 			parentBeaconRoot := crypto.Keccak256Hash(append([]byte("beacon"), heightBytes...))
 
 			l1OriginData := &L1OriginSource{
-				blockHash:        mockBlockHash,
-				stateRoot:        stateRoot,
-				receiptRoot:      receiptRoot,
-				transactionRoot:  transactionRoot,
-				blockHeight:      big.NewInt(int64(i)),
-				parentBeaconRoot: parentBeaconRoot,
+				BlockHash:        mockBlockHash,
+				StateRoot:        stateRoot,
+				ReceiptRoot:      receiptRoot,
+				TransactionRoot:  transactionRoot,
+				BlockHeight:      big.NewInt(int64(i)),
+				ParentBeaconRoot: parentBeaconRoot,
 			}
 
 			// Set up chain config
@@ -99,7 +99,10 @@ func TestL1OriginSource(t *testing.T) {
 			evm := vm.NewEVM(vmContext, statedb, chainConfig, vm.Config{})
 
 			// Process the L1 block info, which should store it in the contract
-			ProcessL1OriginBlockInfo(l1OriginData, evm)
+			err := ProcessL1OriginBlockInfo(l1OriginData, evm)
+			if err != nil {
+				t.Fatalf("failed to process L1 block info: %v", err)
+			}
 
 			// Calculate storage slot for the buffer entry and verify the values
 			bufferIndex := uint64(i) % maxStoredBlocks

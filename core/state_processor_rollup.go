@@ -28,12 +28,12 @@ import (
 
 // Data for the L1OriginSource system  contract (RIP-7859).
 type L1OriginSource struct {
-	blockHash        common.Hash
-	parentBeaconRoot common.Hash
-	stateRoot        common.Hash
-	receiptRoot      common.Hash
-	transactionRoot  common.Hash
-	blockHeight      *big.Int
+	BlockHash        common.Hash
+	ParentBeaconRoot common.Hash
+	StateRoot        common.Hash
+	ReceiptRoot      common.Hash
+	TransactionRoot  common.Hash
+	BlockHeight      *big.Int
 }
 
 // Encodes the system contract function call to update the L1OriginSource data.
@@ -43,20 +43,20 @@ func (l *L1OriginSource) UpdateL1OriginSourceCallData() []byte {
 	data := make([]byte, 4+32*6) // 4 bytes for method ID + 6 parameters of 32 bytes each
 	copy(data[0:4], methodID)
 
-	heightBytes := common.LeftPadBytes(l.blockHeight.Bytes(), 32)
+	heightBytes := common.LeftPadBytes(l.BlockHeight.Bytes(), 32)
 	copy(data[4:36], heightBytes)
-	copy(data[36:68], l.blockHash[:])
-	copy(data[68:100], l.parentBeaconRoot[:])
-	copy(data[100:132], l.stateRoot[:])
-	copy(data[132:164], l.receiptRoot[:])
-	copy(data[164:196], l.transactionRoot[:])
+	copy(data[36:68], l.BlockHash[:])
+	copy(data[68:100], l.ParentBeaconRoot[:])
+	copy(data[100:132], l.StateRoot[:])
+	copy(data[132:164], l.ReceiptRoot[:])
+	copy(data[164:196], l.TransactionRoot[:])
 
 	return data
 }
 
 // ProcessL1OriginBlockInfo stores the L1 block info in the L1OriginSource contract
 // as defined in RIP-7859.
-func ProcessL1OriginBlockInfo(l1OriginSource *L1OriginSource, evm *vm.EVM) {
+func ProcessL1OriginBlockInfo(l1OriginSource *L1OriginSource, evm *vm.EVM) error {
 	if tracer := evm.Config.Tracer; tracer != nil {
 		onSystemCallStart(tracer, evm.GetVMContext())
 		if tracer.OnSystemCallEnd != nil {
@@ -79,11 +79,12 @@ func ProcessL1OriginBlockInfo(l1OriginSource *L1OriginSource, evm *vm.EVM) {
 	_, _, err := evm.Call(msg.From, *msg.To, msg.Data, msg.GasLimit, common.U2560)
 
 	if err != nil {
-		panic(fmt.Errorf("failed to process L1 block info: %v", err))
+		return fmt.Errorf("failed to process L1 block info: %v", err)
 	}
 
 	if evm.StateDB.AccessEvents() != nil {
 		evm.StateDB.AccessEvents().Merge(evm.AccessEvents)
 	}
 	evm.StateDB.Finalise(true)
+	return nil
 }
