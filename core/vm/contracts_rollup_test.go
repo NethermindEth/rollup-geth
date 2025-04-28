@@ -11,7 +11,7 @@ import (
 type MockL1RPCClient struct{}
 
 func (m MockL1RPCClient) StoragesAt(ctx context.Context, account common.Address, keys []common.Hash, blockNumber *big.Int) ([]byte, error) {
-	// testcase is in format "abab", this makes output lenght 2 bytes
+	// testcase is in format "abab", this makes output length 2 bytes
 	const mockedRespValueSize = 2
 	mockResp := make([]byte, mockedRespValueSize*len(keys))
 	for i := range keys {
