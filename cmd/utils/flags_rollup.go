@@ -2,6 +2,7 @@ package utils
 
 import (
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/internal/flags"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
@@ -27,6 +28,12 @@ func ActivateL1RPCEndpoint(ctx *cli.Context, stack *node.Node) {
 	}
 
 	l1RPCEndpoint := ctx.String(L1NodeRPCEndpointFlag.Name)
-	stack.RegisterEthClient(l1RPCEndpoint)
-	vm.SetVmL1RpcClient(stack.EthClient())
+	ethClient, err := ethclient.Dial(l1RPCEndpoint)
+	if err != nil {
+		log.Error("Unable to connect to ETH RPC endpoint at", "URL", ethClient, "error", err)
+		return
+	}
+
+	vm.SetVmL1RpcClient(ethClient)
+	log.Info("Initialized ETH RPC client", "endpoint", ethClient)
 }

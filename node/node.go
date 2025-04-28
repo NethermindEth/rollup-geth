@@ -33,7 +33,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/ethdb/memorydb"
 	"github.com/ethereum/go-ethereum/event"
@@ -68,8 +67,6 @@ type Node struct {
 	inprocHandler *rpc.Server // In-process RPC request handler to process the API requests
 
 	databases map[*closeTrackingDB]struct{} // All open databases
-
-	ethClient *ethclient.Client
 }
 
 const (
@@ -709,12 +706,6 @@ func (n *Node) WSAuthEndpoint() string {
 // the current protocol stack.
 func (n *Node) EventMux() *event.TypeMux {
 	return n.eventmux
-}
-
-// [rollup-geth]
-// EthClient returns instance of ETH RPC client
-func (n *Node) EthClient() *ethclient.Client {
-	return n.ethClient
 }
 
 // OpenDatabase opens an existing database with the given name (or creates one if no

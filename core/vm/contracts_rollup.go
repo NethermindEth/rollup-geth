@@ -6,6 +6,7 @@ package vm
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -86,22 +87,19 @@ func (c *L1SLoad) Run(input []byte) ([]byte, error) {
 		return nil, errors.New("L1SLOAD precompile not active")
 	}
 
-	if len(input) < common.AddressLength+common.HashLength {
-		return nil, errors.New("L1SLOAD input too short")
+	numStorageKeys := (len(input) - common.AddressLength) / common.HashLength
+	if numStorageKeys < 1 || numStorageKeys > params.L1SLoadMaxNumStorageSlots {
+		return nil, fmt.Errorf("L1SLOAD invalid number of storage keys in the input: %d", numStorageKeys)
 	}
 
-	countOfStorageKeysToRead := (len(input) - common.AddressLength) / common.HashLength
-	thereIsAtLeast1StorageKeyToRead := countOfStorageKeysToRead > 0
-	allStorageKeysAreExactly32Bytes := countOfStorageKeysToRead*common.HashLength == len(input)-common.AddressLength
-
-	if inputIsInvalid := !(thereIsAtLeast1StorageKeyToRead && allStorageKeysAreExactly32Bytes); inputIsInvalid {
-		return nil, errors.New("L1SLOAD input is malformed")
+	if len(input) != common.AddressLength+numStorageKeys*common.HashLength {
+		return nil, fmt.Errorf("L1SLOAD invalid input length: %d", len(input))
 	}
 
 	contractAddress := common.BytesToAddress(input[:common.AddressLength])
 	input = input[common.AddressLength-1:]
-	contractStorageKeys := make([]common.Hash, countOfStorageKeysToRead)
-	for k := 0; k < countOfStorageKeysToRead; k++ {
+	contractStorageKeys := make([]common.Hash, numStorageKeys)
+	for k := 0; k < numStorageKeys; k++ {
 		contractStorageKeys[k] = common.BytesToHash(input[k*common.HashLength : (k+1)*common.HashLength])
 	}
 
