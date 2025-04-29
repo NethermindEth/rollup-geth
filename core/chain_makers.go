@@ -102,11 +102,6 @@ func (b *BlockGen) SetParentBeaconRoot(root common.Hash) {
 	ProcessBeaconBlockRoot(root, vm.NewEVM(blockContext, b.statedb, b.cm.config, vm.Config{}))
 }
 
-// // SetSlotNumber sets the slot number field of the generated block.
-// func (b *BlockGen) SetSlotNumber(slotNumber uint64) {
-// 	b.header.SlotNumber = &slotNumber
-// }
-
 // addTx adds a transaction to the generated block. If no coinbase has
 // been set, the block's coinbase is set to the zero address.
 //
