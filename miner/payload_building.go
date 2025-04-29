@@ -44,6 +44,7 @@ type BuildPayloadArgs struct {
 	Withdrawals  types.Withdrawals     // The provided withdrawals
 	BeaconRoot   *common.Hash          // The provided beaconRoot (Cancun)
 	Version      engine.PayloadVersion // Versioning byte for payload id calculation.
+	SlotNumber   uint64                // The provided slot number
 }
 
 // Id computes an 8-byte identifier by hashing the components of the payload arguments.
@@ -57,6 +58,7 @@ func (args *BuildPayloadArgs) Id() engine.PayloadID {
 	if args.BeaconRoot != nil {
 		hasher.Write(args.BeaconRoot[:])
 	}
+	binary.Write(hasher, binary.BigEndian, args.SlotNumber)
 	var out engine.PayloadID
 	copy(out[:], hasher.Sum(nil)[:8])
 	out[0] = byte(args.Version)
@@ -218,6 +220,7 @@ func (miner *Miner) buildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 		random:      args.Random,
 		withdrawals: args.Withdrawals,
 		beaconRoot:  args.BeaconRoot,
+		slotNumber:  args.SlotNumber,
 		noTxs:       true,
 	}
 	empty := miner.generateWork(emptyParams, witness)
@@ -248,6 +251,7 @@ func (miner *Miner) buildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 			random:      args.Random,
 			withdrawals: args.Withdrawals,
 			beaconRoot:  args.BeaconRoot,
+			slotNumber:  args.SlotNumber,
 			noTxs:       false,
 		}
 

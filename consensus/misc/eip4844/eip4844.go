@@ -89,6 +89,8 @@ func CalcBlobFee(config *params.ChainConfig, header *types.Header) *big.Int {
 		frac = config.BlobScheduleConfig.Prague.UpdateFraction
 	case forks.Cancun:
 		frac = config.BlobScheduleConfig.Cancun.UpdateFraction
+	case forks.CommonCoreV1:
+		frac = config.BlobScheduleConfig.CommonCoreV1.UpdateFraction
 	default:
 		panic("calculating blob fee on unsupported fork")
 	}

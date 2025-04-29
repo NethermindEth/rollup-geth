@@ -325,11 +325,18 @@ var (
 		Max:            9,
 		UpdateFraction: 5007716,
 	}
+	// DefaultOsakaBlobConfig is the default blob configuration for the Osaka fork.
+	DefaultCommonCoreBlobConfig = &BlobConfig{
+		Target:         6,
+		Max:            9,
+		UpdateFraction: 5007716,
+	}
 	// DefaultBlobSchedule is the latest configured blob schedule for test chains.
 	DefaultBlobSchedule = &BlobScheduleConfig{
-		Cancun: DefaultCancunBlobConfig,
-		Prague: DefaultPragueBlobConfig,
-		Osaka:  DefaultOsakaBlobConfig,
+		Cancun:       DefaultCancunBlobConfig,
+		Prague:       DefaultPragueBlobConfig,
+		Osaka:        DefaultOsakaBlobConfig,
+		CommonCoreV1: DefaultCommonCoreBlobConfig,
 	}
 )
 
@@ -371,12 +378,12 @@ type ChainConfig struct {
 
 	// Fork scheduling was switched from blocks to timestamps here
 
-	ShanghaiTime       *uint64 `json:"shanghaiTime,omitempty"`       // Shanghai switch time (nil = no fork, 0 = already on shanghai)
-	CancunTime         *uint64 `json:"cancunTime,omitempty"`         // Cancun switch time (nil = no fork, 0 = already on cancun)
-	PragueTime         *uint64 `json:"pragueTime,omitempty"`         // Prague switch time (nil = no fork, 0 = already on prague)
-	OsakaTime          *uint64 `json:"osakaTime,omitempty"`          // Osaka switch time (nil = no fork, 0 = already on osaka)
-	VerkleTime         *uint64 `json:"verkleTime,omitempty"`         // Verkle switch time (nil = no fork, 0 = already on verkle)
-	SlotPrecompileTime *uint64 `json:"slotPrecompileTime,omitempty"` // EIP-7843 SLOT precompile activation time
+	ShanghaiTime     *uint64 `json:"shanghaiTime,omitempty"`       // Shanghai switch time (nil = no fork, 0 = already on shanghai)
+	CancunTime       *uint64 `json:"cancunTime,omitempty"`         // Cancun switch time (nil = no fork, 0 = already on cancun)
+	PragueTime       *uint64 `json:"pragueTime,omitempty"`         // Prague switch time (nil = no fork, 0 = already on prague)
+	OsakaTime        *uint64 `json:"osakaTime,omitempty"`          // Osaka switch time (nil = no fork, 0 = already on osaka)
+	VerkleTime       *uint64 `json:"verkleTime,omitempty"`         // Verkle switch time (nil = no fork, 0 = already on verkle)
+	CommonCoreV1Time *uint64 `json:"slotPrecompileTime,omitempty"` // EIP-7843 SLOT precompile activation time
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
@@ -509,10 +516,11 @@ type BlobConfig struct {
 
 // BlobScheduleConfig determines target and max number of blobs allow per fork.
 type BlobScheduleConfig struct {
-	Cancun *BlobConfig `json:"cancun,omitempty"`
-	Prague *BlobConfig `json:"prague,omitempty"`
-	Osaka  *BlobConfig `json:"osaka,omitempty"`
-	Verkle *BlobConfig `json:"verkle,omitempty"`
+	Cancun       *BlobConfig `json:"cancun,omitempty"`
+	Prague       *BlobConfig `json:"prague,omitempty"`
+	Osaka        *BlobConfig `json:"osaka,omitempty"`
+	Verkle       *BlobConfig `json:"verkle,omitempty"`
+	CommonCoreV1 *BlobConfig `json:"commonCoreV1,omitempty"`
 }
 
 // IsHomestead returns whether num is either equal to the homestead block or greater.
@@ -622,8 +630,7 @@ func (c *ChainConfig) IsVerkle(num *big.Int, time uint64) bool {
 
 // IsCommonCoreV1 returns whether time is either equal to the CCV1 fork time or greater.
 func (c *ChainConfig) IsCommonCoreV1(num *big.Int, time uint64) bool {
-	// For simplicity, we check if it is Cancun or later; in real life, we would check for timestamp like the others
-	return c.IsCancun(num, time)
+	return c.IsLondon(num) && isTimestampForked(c.CommonCoreV1Time, time)
 }
 
 // IsVerkleGenesis checks whether the verkle fork is activated at the genesis block.
@@ -701,7 +708,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "pragueTime", timestamp: c.PragueTime, optional: true},
 		{name: "osakaTime", timestamp: c.OsakaTime, optional: true},
 		{name: "verkleTime", timestamp: c.VerkleTime, optional: true},
-		{name: "slotPrecompileTime", timestamp: c.SlotPrecompileTime, optional: true},
+		{name: "CommonCoreV1Time", timestamp: c.CommonCoreV1Time, optional: true},
 	} {
 		if lastFork.name != "" {
 			switch {
@@ -851,8 +858,8 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 	if isForkTimestampIncompatible(c.VerkleTime, newcfg.VerkleTime, headTimestamp) {
 		return newTimestampCompatError("Verkle fork timestamp", c.VerkleTime, newcfg.VerkleTime)
 	}
-	if isForkTimestampIncompatible(c.SlotPrecompileTime, newcfg.SlotPrecompileTime, headTimestamp) {
-		return newTimestampCompatError("SlotPrecompile fork timestamp", c.SlotPrecompileTime, newcfg.SlotPrecompileTime)
+	if isForkTimestampIncompatible(c.CommonCoreV1Time, newcfg.CommonCoreV1Time, headTimestamp) {
+		return newTimestampCompatError("CommonCoreV1Time fork timestamp", c.CommonCoreV1Time, newcfg.CommonCoreV1Time)
 	}
 	return nil
 }
@@ -877,6 +884,8 @@ func (c *ChainConfig) LatestFork(time uint64) forks.Fork {
 		return forks.Osaka
 	case c.IsPrague(london, time):
 		return forks.Prague
+	case c.IsCommonCoreV1(london, time):
+		return forks.CommonCoreV1
 	case c.IsCancun(london, time):
 		return forks.Cancun
 	case c.IsShanghai(london, time):

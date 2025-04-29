@@ -1801,3 +1801,63 @@ func TestValidateRequests(t *testing.T) {
 		})
 	}
 }
+
+func TestForkchoiceUpdatedV4(t *testing.T) {
+	genesis, blocks := generateMergeChain(10, true)
+	time := blocks[len(blocks)-1].Time() + 5
+	genesis.Config.ShanghaiTime = &time
+	genesis.Config.CancunTime = &time
+	genesis.Config.BlobScheduleConfig = params.DefaultBlobSchedule
+	genesis.Config.CommonCoreV1Time = &time
+	n, ethservice := startEthService(t, genesis, blocks)
+	defer n.Close()
+
+	api := NewConsensusAPI(ethservice)
+
+	fcState := engine.ForkchoiceStateV1{
+		HeadBlockHash:      blocks[len(blocks)-1].Hash(),
+		SafeBlockHash:      common.Hash{},
+		FinalizedBlockHash: common.Hash{},
+	}
+
+	// Create payload attributes for the next block
+	payloadAttrs := engine.PayloadAttributes{
+		Timestamp:             blocks[len(blocks)-1].Time() + 5,
+		Random:                common.Hash{},
+		SuggestedFeeRecipient: common.Address{},
+		Withdrawals:           []*types.Withdrawal{},
+		BeaconRoot:            &common.Hash{},
+		SlotNumber:            blocks[len(blocks)-1].Number().Uint64() + 1,
+	}
+	// Request a new block that should include our transaction
+	fcuResp, err := api.ForkchoiceUpdatedV4(fcState, &payloadAttrs)
+	if err != nil {
+		t.Fatalf("Failed to update forkchoice: %v", err)
+	}
+
+	// Get the payload
+	if fcuResp.PayloadID == nil {
+		t.Fatalf("No payload ID received")
+	}
+	payload, err := api.GetPayloadV4(*fcuResp.PayloadID)
+	if err != nil {
+		t.Fatalf("Failed to get payload: %v", err)
+	}
+
+	// Execute the payload
+	response, err := api.NewPayloadV5(*payload.ExecutionPayload, []common.Hash{}, &common.Hash{}, []hexutil.Bytes{})
+	if err != nil {
+		t.Fatalf("Failed to execute payload: %v", err)
+	}
+	if response.Status != engine.VALID {
+		t.Fatalf("Payload execution returned %s", response.Status)
+	}
+	if payload.ExecutionPayload.SlotNumber == nil {
+		t.Fatalf("Slot number is nil")
+	}
+
+	if *payload.ExecutionPayload.SlotNumber != blocks[len(blocks)-1].Number().Uint64()+1 {
+		t.Fatalf("Slot number mismatch: %d != %d", *payload.ExecutionPayload.SlotNumber, blocks[len(blocks)-1].Number().Uint64()+1)
+	}
+
+}

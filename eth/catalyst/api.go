@@ -436,8 +436,6 @@ func (api *ConsensusAPI) forkchoiceUpdated(update engine.ForkchoiceStateV1, payl
 	// sealed by the beacon client. The payload will be requested later, and we
 	// will replace it arbitrarily many times in between.
 	if payloadAttributes != nil {
-		// // Store the slot number in a variable so we can use it for logging
-		// slotNumber := payloadAttributes.SlotNumber
 		args := &miner.BuildPayloadArgs{
 			Parent:       update.HeadBlockHash,
 			Timestamp:    payloadAttributes.Timestamp,
@@ -446,6 +444,7 @@ func (api *ConsensusAPI) forkchoiceUpdated(update engine.ForkchoiceStateV1, payl
 			Withdrawals:  payloadAttributes.Withdrawals,
 			BeaconRoot:   payloadAttributes.BeaconRoot,
 			Version:      payloadVersion,
+			SlotNumber:   payloadAttributes.SlotNumber,
 		}
 		id := args.Id()
 		// If we already are busy generating this work, then we do not need
@@ -453,7 +452,6 @@ func (api *ConsensusAPI) forkchoiceUpdated(update engine.ForkchoiceStateV1, payl
 		if api.localBlocks.has(id) {
 			return valid(&id), nil
 		}
-		//log.Info("Building payload with slot", "slot", slotNumber)
 		payload, err := api.eth.Miner().BuildPayload(args, payloadWitness)
 		if err != nil {
 			log.Error("Failed to build payload", "err", err)
@@ -525,7 +523,7 @@ func (api *ConsensusAPI) GetPayloadV3(payloadID engine.PayloadID) (*engine.Execu
 
 // GetPayloadV4 returns a cached payload by id.
 func (api *ConsensusAPI) GetPayloadV4(payloadID engine.PayloadID) (*engine.ExecutionPayloadEnvelope, error) {
-	if !payloadID.Is(engine.PayloadV3) {
+	if !payloadID.Is(engine.PayloadV4) {
 		return nil, engine.UnsupportedFork
 	}
 	return api.getPayload(payloadID, false)
@@ -626,7 +624,12 @@ func (api *ConsensusAPI) NewPayloadV4(params engine.ExecutableData, versionedHas
 	if params.BlobGasUsed == nil {
 		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.InvalidParams.With(errors.New("nil blobGasUsed post-cancun"))
 	}
-
+	if params.SlotNumber == nil {
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.InvalidParams.With(errors.New("nil slotNumber post-cancun"))
+	}
+	if api.eth.BlockChain().Config().LatestFork(params.Timestamp) != forks.CommonCoreV1 {
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.UnsupportedFork.With(errors.New("newPayloadV5 must only be called for commoncore payloads"))
+	}
 	if versionedHashes == nil {
 		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.InvalidParams.With(errors.New("nil versionedHashes post-cancun"))
 	}
@@ -638,7 +641,22 @@ func (api *ConsensusAPI) NewPayloadV4(params engine.ExecutableData, versionedHas
 	}
 
 	if api.eth.BlockChain().Config().LatestFork(params.Timestamp) != forks.Prague {
-		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.UnsupportedFork.With(errors.New("newPayloadV4 must only be called for prague payloads"))
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.UnsupportedFork.With(errors.New("newPayloadV4 must only be called for prague payloads or commoncore"))
+	}
+	requests := convertRequests(executionRequests)
+	if err := validateRequests(requests); err != nil {
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.InvalidParams.With(err)
+	}
+	return api.newPayload(params, versionedHashes, beaconRoot, requests, false)
+}
+
+// NewPayloadV5 creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
+func (api *ConsensusAPI) NewPayloadV5(params engine.ExecutableData, versionedHashes []common.Hash, beaconRoot *common.Hash, executionRequests []hexutil.Bytes) (engine.PayloadStatusV1, error) {
+	if params.SlotNumber == nil {
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.InvalidParams.With(errors.New("nil slotNumber post-cancun"))
+	}
+	if api.eth.BlockChain().Config().LatestFork(params.Timestamp) != forks.CommonCoreV1 {
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.UnsupportedFork.With(errors.New("newPayloadV5 must only be called for commoncore payloads"))
 	}
 	requests := convertRequests(executionRequests)
 	if err := validateRequests(requests); err != nil {
