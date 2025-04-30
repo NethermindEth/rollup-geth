@@ -896,6 +896,9 @@ func (api *ConsensusAPI) newPayload(params engine.ExecutableData, versionedHashe
 			"error", err)
 		return api.invalid(err, nil), nil
 	}
+	if params.SlotNumber != nil {
+		block.Header().SlotNumber = params.SlotNumber
+	}
 	// Stash away the last update to warn the user if the beacon client goes offline
 	api.lastNewPayloadLock.Lock()
 	api.lastNewPayloadUpdate = time.Now()

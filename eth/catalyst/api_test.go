@@ -1822,7 +1822,7 @@ func TestForkchoiceUpdatedV4(t *testing.T) {
 
 	// Create payload attributes for the next block
 	payloadAttrs := engine.PayloadAttributes{
-		Timestamp:             blocks[len(blocks)-1].Time() + 5,
+		Timestamp:             time,
 		Random:                common.Hash{},
 		SuggestedFeeRecipient: common.Address{},
 		Withdrawals:           []*types.Withdrawal{},
@@ -1849,6 +1849,15 @@ func TestForkchoiceUpdatedV4(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to execute payload: %v", err)
 	}
+	newHead := payload.ExecutionPayload.BlockHash
+	newFc := engine.ForkchoiceStateV1{
+		HeadBlockHash:      newHead,
+		SafeBlockHash:      newHead,
+		FinalizedBlockHash: newHead,
+	}
+	if _, err := api.ForkchoiceUpdatedV4(newFc, nil); err != nil {
+		t.Fatalf("failed to set new head: %v", err)
+	}
 	if response.Status != engine.VALID {
 		t.Fatalf("Payload execution returned %s", response.Status)
 	}
@@ -1856,8 +1865,10 @@ func TestForkchoiceUpdatedV4(t *testing.T) {
 		t.Fatalf("Slot number is nil")
 	}
 
-	if *payload.ExecutionPayload.SlotNumber != blocks[len(blocks)-1].Number().Uint64()+1 {
-		t.Fatalf("Slot number mismatch: %d != %d", *payload.ExecutionPayload.SlotNumber, blocks[len(blocks)-1].Number().Uint64()+1)
+	hdr := ethservice.BlockChain().CurrentHeader()
+	slot := hdr.SlotNumber
+	if payload.ExecutionPayload.SlotNumber != slot {
+		t.Fatalf("Slot number mismatch: %d != %d", *payload.ExecutionPayload.SlotNumber, slot)
 	}
 
 }

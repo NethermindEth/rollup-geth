@@ -148,6 +148,7 @@ func (payload *Payload) Resolve() *engine.ExecutionPayloadEnvelope {
 	}
 	if payload.full != nil {
 		envelope := engine.BlockToExecutableData(payload.full, payload.fullFees, payload.sidecars, payload.requests)
+		envelope.ExecutionPayload.SlotNumber = payload.full.Header().SlotNumber
 		if payload.fullWitness != nil {
 			envelope.Witness = new(hexutil.Bytes)
 			*envelope.Witness, _ = rlp.EncodeToBytes(payload.fullWitness) // cannot fail
@@ -169,6 +170,7 @@ func (payload *Payload) ResolveEmpty() *engine.ExecutionPayloadEnvelope {
 	defer payload.lock.Unlock()
 
 	envelope := engine.BlockToExecutableData(payload.empty, big.NewInt(0), nil, payload.emptyRequests)
+	envelope.ExecutionPayload.SlotNumber = payload.empty.Header().SlotNumber
 	if payload.emptyWitness != nil {
 		envelope.Witness = new(hexutil.Bytes)
 		*envelope.Witness, _ = rlp.EncodeToBytes(payload.emptyWitness) // cannot fail
@@ -200,6 +202,7 @@ func (payload *Payload) ResolveFull() *engine.ExecutionPayloadEnvelope {
 		close(payload.stop)
 	}
 	envelope := engine.BlockToExecutableData(payload.full, payload.fullFees, payload.sidecars, payload.requests)
+	envelope.ExecutionPayload.SlotNumber = payload.full.Header().SlotNumber
 	if payload.fullWitness != nil {
 		envelope.Witness = new(hexutil.Bytes)
 		*envelope.Witness, _ = rlp.EncodeToBytes(payload.fullWitness) // cannot fail
@@ -227,6 +230,9 @@ func (miner *Miner) buildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 	if empty.err != nil {
 		return nil, empty.err
 	}
+	slotNum := args.SlotNumber
+	empty.block.Header().SlotNumber = &slotNum
+
 	// Construct a payload object for return.
 	payload := newPayload(empty.block, empty.requests, empty.witness, args.Id())
 
@@ -261,6 +267,8 @@ func (miner *Miner) buildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 				start := time.Now()
 				r := miner.generateWork(fullParams, witness)
 				if r.err == nil {
+					slotNum := args.SlotNumber
+					r.block.Header().SlotNumber = &slotNum
 					payload.update(r, time.Since(start))
 				} else {
 					log.Info("Error while generating work", "id", payload.id, "err", r.err)
