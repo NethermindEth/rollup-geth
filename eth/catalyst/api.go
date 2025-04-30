@@ -250,6 +250,15 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV3(update engine.ForkchoiceStateV1, pa
 	return api.forkchoiceUpdated(update, params, engine.PayloadV3, false)
 }
 
+func (api *ConsensusAPI) ForkchoiceUpdatedV4(update engine.ForkchoiceStateV1, params *engine.PayloadAttributes) (engine.ForkChoiceResponse, error) {
+	if params != nil {
+		if api.eth.BlockChain().Config().LatestFork(params.Timestamp) != forks.CommonCoreV1 {
+			return engine.STATUS_INVALID, engine.UnsupportedFork.With(errors.New("forkchoiceUpdatedV4 must only be called for CommonCoreV1 payloads"))
+		}
+	}
+	return api.forkchoiceUpdated(update, params, engine.PayloadV4, false)
+}
+
 // ForkchoiceUpdatedWithWitnessV1 is analogous to ForkchoiceUpdatedV1, only it
 // generates an execution witness too if block building was requested.
 func (api *ConsensusAPI) ForkchoiceUpdatedWithWitnessV1(update engine.ForkchoiceStateV1, payloadAttributes *engine.PayloadAttributes) (engine.ForkChoiceResponse, error) {
@@ -435,6 +444,7 @@ func (api *ConsensusAPI) forkchoiceUpdated(update engine.ForkchoiceStateV1, payl
 			Withdrawals:  payloadAttributes.Withdrawals,
 			BeaconRoot:   payloadAttributes.BeaconRoot,
 			Version:      payloadVersion,
+			SlotNumber:   payloadAttributes.SlotNumber,
 		}
 		id := args.Id()
 		// If we already are busy generating this work, then we do not need
@@ -513,7 +523,7 @@ func (api *ConsensusAPI) GetPayloadV3(payloadID engine.PayloadID) (*engine.Execu
 
 // GetPayloadV4 returns a cached payload by id.
 func (api *ConsensusAPI) GetPayloadV4(payloadID engine.PayloadID) (*engine.ExecutionPayloadEnvelope, error) {
-	if !payloadID.Is(engine.PayloadV3) {
+	if !payloadID.Is(engine.PayloadV4) {
 		return nil, engine.UnsupportedFork
 	}
 	return api.getPayload(payloadID, false)
@@ -614,7 +624,12 @@ func (api *ConsensusAPI) NewPayloadV4(params engine.ExecutableData, versionedHas
 	if params.BlobGasUsed == nil {
 		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.InvalidParams.With(errors.New("nil blobGasUsed post-cancun"))
 	}
-
+	if params.SlotNumber == nil {
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.InvalidParams.With(errors.New("nil slotNumber post-cancun"))
+	}
+	if api.eth.BlockChain().Config().LatestFork(params.Timestamp) != forks.CommonCoreV1 {
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.UnsupportedFork.With(errors.New("newPayloadV5 must only be called for commoncore payloads"))
+	}
 	if versionedHashes == nil {
 		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.InvalidParams.With(errors.New("nil versionedHashes post-cancun"))
 	}
@@ -626,7 +641,22 @@ func (api *ConsensusAPI) NewPayloadV4(params engine.ExecutableData, versionedHas
 	}
 
 	if api.eth.BlockChain().Config().LatestFork(params.Timestamp) != forks.Prague {
-		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.UnsupportedFork.With(errors.New("newPayloadV4 must only be called for prague payloads"))
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.UnsupportedFork.With(errors.New("newPayloadV4 must only be called for prague payloads or commoncore"))
+	}
+	requests := convertRequests(executionRequests)
+	if err := validateRequests(requests); err != nil {
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.InvalidParams.With(err)
+	}
+	return api.newPayload(params, versionedHashes, beaconRoot, requests, false)
+}
+
+// NewPayloadV5 creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
+func (api *ConsensusAPI) NewPayloadV5(params engine.ExecutableData, versionedHashes []common.Hash, beaconRoot *common.Hash, executionRequests []hexutil.Bytes) (engine.PayloadStatusV1, error) {
+	if params.SlotNumber == nil {
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.InvalidParams.With(errors.New("nil slotNumber post-cancun"))
+	}
+	if api.eth.BlockChain().Config().LatestFork(params.Timestamp) != forks.CommonCoreV1 {
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.UnsupportedFork.With(errors.New("newPayloadV5 must only be called for commoncore payloads"))
 	}
 	requests := convertRequests(executionRequests)
 	if err := validateRequests(requests); err != nil {
@@ -865,6 +895,9 @@ func (api *ConsensusAPI) newPayload(params engine.ExecutableData, versionedHashe
 			"len(requests)", len(requests),
 			"error", err)
 		return api.invalid(err, nil), nil
+	}
+	if params.SlotNumber != nil {
+		block.Header().SlotNumber = params.SlotNumber
 	}
 	// Stash away the last update to warn the user if the beacon client goes offline
 	api.lastNewPayloadLock.Lock()

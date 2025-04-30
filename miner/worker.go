@@ -91,6 +91,7 @@ type generateParams struct {
 	withdrawals types.Withdrawals // List of withdrawals to include in block (shanghai field)
 	beaconRoot  *common.Hash      // The beacon root (cancun field).
 	noTxs       bool              // Flag whether an empty block without any transaction is expected
+	slotNumber  uint64            // The slot number for sealing task
 }
 
 // generateWork generates a sealing block based on the given parameters.
@@ -215,6 +216,10 @@ func (miner *Miner) prepareWork(genParams *generateParams, witness bool) (*envir
 		header.BlobGasUsed = new(uint64)
 		header.ExcessBlobGas = &excessBlobGas
 		header.ParentBeaconRoot = genParams.beaconRoot
+	}
+	// Set the slot number if CommonCoreV1 is active
+	if miner.chainConfig.IsCommonCoreV1(header.Number, header.Time) {
+		header.SlotNumber = &genParams.slotNumber
 	}
 	// Could potentially happen if starting to mine in an odd state.
 	// Note genParams.coinbase can be different with header.Coinbase

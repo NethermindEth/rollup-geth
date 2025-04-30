@@ -136,18 +136,21 @@ var PrecompiledContractsPrague = PrecompiledContracts{
 	common.BytesToAddress([]byte{0x10}): &bls12381MapG1{},
 	common.BytesToAddress([]byte{0x11}): &bls12381MapG2{},
 }
-
+var PrecompiledContractsCommonCoreV1 = PrecompiledContracts{
+	common.BytesToAddress([]byte{0x12}): &SlotPrecompile{},
+}
 var PrecompiledContractsBLS = PrecompiledContractsPrague
 
 var PrecompiledContractsVerkle = PrecompiledContractsPrague
 
 var (
-	PrecompiledAddressesPrague    []common.Address
-	PrecompiledAddressesCancun    []common.Address
-	PrecompiledAddressesBerlin    []common.Address
-	PrecompiledAddressesIstanbul  []common.Address
-	PrecompiledAddressesByzantium []common.Address
-	PrecompiledAddressesHomestead []common.Address
+	PrecompiledAddressesPrague       []common.Address
+	PrecompiledAddressesCancun       []common.Address
+	PrecompiledAddressesBerlin       []common.Address
+	PrecompiledAddressesIstanbul     []common.Address
+	PrecompiledAddressesByzantium    []common.Address
+	PrecompiledAddressesHomestead    []common.Address
+	PrecompiledAddressesCommonCoreV1 []common.Address
 )
 
 func init() {
@@ -169,10 +172,15 @@ func init() {
 	for k := range PrecompiledContractsPrague {
 		PrecompiledAddressesPrague = append(PrecompiledAddressesPrague, k)
 	}
+	for k := range PrecompiledContractsCommonCoreV1 {
+		PrecompiledAddressesCommonCoreV1 = append(PrecompiledAddressesCommonCoreV1, k)
+	}
 }
 
 func activePrecompiledContracts(rules params.Rules) PrecompiledContracts {
 	switch {
+	case rules.IsCommonCoreV1:
+		return PrecompiledContractsCommonCoreV1
 	case rules.IsVerkle:
 		return PrecompiledContractsVerkle
 	case rules.IsPrague:
@@ -1181,4 +1189,29 @@ func kZGToVersionedHash(kzg kzg4844.Commitment) common.Hash {
 	h[0] = blobCommitmentVersionKZG
 
 	return h
+}
+
+// slotPrecompile is a precompile that returns the current slot number as an 8-byte uint64 in big-endian encoding
+type SlotPrecompile struct {
+	SlotFn func() uint64
+}
+
+// RequiredGas returns the gas required to execute the precompiled contract.
+// This precompile is priced to match similar opcodes in the W_base set.
+func (c *SlotPrecompile) RequiredGas(input []byte) uint64 {
+	return params.SlotPrecompileGas
+}
+
+// Run returns the current slot number of the block as an 8-byte uint64 in big-endian encoding.
+func (c *SlotPrecompile) Run(input []byte) ([]byte, error) {
+
+	if c.SlotFn == nil {
+		return nil, fmt.Errorf("slot precompile: no slot provided")
+	}
+	slot := c.SlotFn()
+
+	slotBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(slotBytes, slot)
+
+	return slotBytes, nil
 }

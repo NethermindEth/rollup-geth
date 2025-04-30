@@ -38,6 +38,7 @@ const (
 	Paris
 	Shanghai
 	Cancun
+	CommonCoreV1
 	Prague
 	Osaka
 )
